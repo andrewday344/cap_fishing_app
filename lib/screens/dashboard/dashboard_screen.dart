@@ -2,12 +2,12 @@ import '../logbook/logbook_screen.dart';
 import 'package:flutter/material.dart';
 import '../../core/safety_engine.dart';
 import '../../widgets/data_tile.dart';
-import '../catch_log/catch_log_screen.dart'; // Import the new screen
-import '../../widgets/tide_card.dart';
+//import '../catch_log/catch_log_screen.dart'; // Import the new screen
+//import '../../widgets/tide_card.dart';
 import '../../widgets/safety_map_card.dart';
 import '../../services/location_service.dart';
 import 'package:geolocator/geolocator.dart'; // REQUIRED for the Position type
-
+import '../../services/willy_weather_service.dart';
 
 class DashboardScreen extends StatelessWidget {
   final bool isInshore;
@@ -15,105 +15,83 @@ class DashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Mock Data for Seacliff
-    const double windSpeed = 18.0; 
-    final verdict = SafetyEngine.getVerdict(isInshore, windSpeed);
-    final statusColor = SafetyEngine.getStatusColor(verdict);
+    // 2. We use a FutureBuilder to wrap the whole screen or just the data parts
+    return FutureBuilder<Map<String, dynamic>>(
+      future: WillyWeatherService().getMarineWeather(), // Call the service
+      builder: (context, weatherSnapshot) {
+        
+        // Default values while loading or on error
+        double windSpeed = 0.0;
+        String windDir = "--";
+        String tideInfo = "Loading...";
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        title: const Text("Seacliff Dashboard"),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.history),
-            tooltip: "View Private Logbook",
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => LogbookScreen()), // Cleaned up
-              );
-            },
+        if (weatherSnapshot.hasData) {
+          final data = weatherSnapshot.data!;
+          windSpeed = double.tryParse(data['windKnots'] ?? '0') ?? 0.0;
+          windDir = data['windDir'] ?? "";
+          tideInfo = "Next: ${data['tideStatus']}";
+        }
+
+        final verdict = SafetyEngine.getVerdict(isInshore, windSpeed);
+        final statusColor = SafetyEngine.getStatusColor(verdict);
+
+        return Scaffold(
+          backgroundColor: const Color(0xFFF8FAFC),
+          appBar: AppBar(
+            title: const Text("Seacliff Dashboard"),
+            centerTitle: true,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.history),
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const LogbookScreen())),
+              ),
+            ],
           ),
-        ],
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            _SafetyGauge(windSpeed: windSpeed, color: statusColor, verdict: verdict),
-            const SizedBox(height: 20),
-            const TideCard(),            
-            const SizedBox(height: 12),
-
-            // REAL-TIME GPS TRACKER
-            StreamBuilder<Position>(
-              stream: LocationService().getPositionStream(),
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return const Text("GPS Error: Check Permissions");
-                }
+          body: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                // Live Wind Gauge
+                _SafetyGauge(windSpeed: windSpeed, color: statusColor, verdict: verdict),
                 
-                if (!snapshot.hasData) {
-                  // While waiting for the first GPS fix
-                  return const SafetyMapCard(distanceInMeters: 0);
-                }
+                const SizedBox(height: 20),
+                Text(tideInfo, style: const TextStyle(fontWeight: FontWeight.bold)), 
+                const SizedBox(height: 12),
 
-                final position = snapshot.data!;
-                final distance = LocationService().getDistanceToRamp(
-                  position.latitude, 
-                  position.longitude
-                );
-
-                return SafetyMapCard(distanceInMeters: distance);
-              },
-            ),
-
-            const SafetyMapCard(distanceInMeters: 2400), // Mocked at 2.4km for now
-
-            const SizedBox(height: 20),
-            
-            // 2. Weather Data Grid
-            Expanded(
-              child: GridView.count(
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                children: const [
-                  DataTile(label: "Wind", value: "18 kts", icon: Icons.air, color: Colors.blue),
-                  DataTile(label: "Tide", value: "0.9m Low", icon: Icons.water, color: Colors.cyan),
-                  DataTile(label: "Swell", value: "0.4m", icon: Icons.waves, color: Colors.indigo),
-                  DataTile(label: "Bite Status", value: "High", icon: Icons.phishing, color: Colors.green),
-                ],
-              ),
-            ),
-
-            // 3. The "Record Catch" Button (Restored)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16.0),
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  // Standard Flutter navigation to the Catch Log
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const CatchLogScreen()),
-                  );
-                },
-                icon: const Icon(Icons.add_circle_outline),
-                label: const Text("RECORD PRIVATE CATCH", 
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 60), // Tall button for easy tapping
-                  backgroundColor: const Color(0xFF004E92),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                // YOUR EXISTING GPS STREAM
+                StreamBuilder<Position>(
+                  stream: LocationService().getPositionStream(),
+                  builder: (context, gpsSnapshot) {
+                    final distance = gpsSnapshot.hasData 
+                      ? LocationService().getDistanceToRamp(gpsSnapshot.data!.latitude, gpsSnapshot.data!.longitude)
+                      : 0.0;
+                    return SafetyMapCard(distanceInMeters: distance);
+                  },
                 ),
-              ),
+
+                const SizedBox(height: 20),
+                
+                // Weather Data Grid with LIVE WillyWeather values
+                Expanded(
+                  child: GridView.count(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    children: [
+                      DataTile(label: "Wind", value: "${windSpeed.toInt()} kts $windDir", icon: Icons.air, color: Colors.blue),
+                      DataTile(label: "Tide", value: tideInfo, icon: Icons.water, color: Colors.cyan),
+                      const DataTile(label: "Swell", value: "0.4m", icon: Icons.waves, color: Colors.indigo),
+                      const DataTile(label: "Bite Status", value: "High", icon: Icons.phishing, color: Colors.green),
+                    ],
+                  ),
+                ),
+
+                // Record Catch Button... (Keep your existing button code here)
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      }
     );
   }
 }
