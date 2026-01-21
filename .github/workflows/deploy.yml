@@ -14,7 +14,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-      - run: flutter build web --release --base-href "/cap_fishing_app/"
+      - run: flutter build web --release --base-href "/cap_fishing_app/" --dart-define=WILLY_API_KEY=${{ secrets.WILLY_API_KEY }}
       - uses: actions/configure-pages@v4
       - uses: actions/upload-pages-artifact@v3
         with:

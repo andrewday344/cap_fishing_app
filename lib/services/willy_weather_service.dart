@@ -2,10 +2,9 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class WillyWeatherService {
-  final String apiKey = 'MjkzZmUzMTVlYTdhNDIzNjRiZjhjZG'; // Paste your key here
-  
+  static const String apiKey = String.fromEnvironment('WILLY_API_KEY');
   // Seacliff, SA Location ID
-  final String locationId = '11341'; 
+  final String locationId = '9765'; 
 
   Future<Map<String, dynamic>> getMarineWeather() async {
     // We request observational (current) and wind/tide forecasts
