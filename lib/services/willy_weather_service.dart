@@ -9,7 +9,7 @@ class WillyWeatherService {
   Future<Map<String, dynamic>> getMarineWeather() async {
   //final url = 'https://api.willyweather.com.au/v2/$apiKey/locations/9765/weather.json?observational=true&forecasts=wind,tides';
   // Add "https://corsproxy.io/?" to the start of your URL
-final url = 'https://corsproxy.io/?https://api.willyweather.com.au/v2/$apiKey/locations/9765/weather.json?observational=true&forecasts=wind,tides';
+  final url = 'https://corsproxy.io/?https://api.willyweather.com.au/v2/$apiKey/locations/9765/weather.json?observational=true&forecasts=wind,tides';
 
   try {
     final response = await http.get(Uri.parse(url));
