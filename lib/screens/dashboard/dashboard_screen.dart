@@ -19,7 +19,10 @@ class DashboardScreen extends StatelessWidget {
     return FutureBuilder<Map<String, dynamic>>(
       future: WillyWeatherService().getMarineWeather(), // Call the service
       builder: (context, weatherSnapshot) {
-        
+        // Add this temporary line to see what's happening on your iPhone:
+        if (weatherSnapshot.hasError) return Center(child: Text("Error: ${weatherSnapshot.error}"));
+        if (!weatherSnapshot.hasData) return const Center(child: CircularProgressIndicator());
+
         // Default values while loading or on error
         double windSpeed = 0.0;
         String windDir = "--";
