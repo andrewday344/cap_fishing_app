@@ -27,9 +27,10 @@ class DashboardScreen extends StatelessWidget {
 
         if (weatherSnapshot.hasData) {
           final data = weatherSnapshot.data!;
+          // Make sure these keys match exactly what we returned above!
           windSpeed = double.tryParse(data['windKnots'] ?? '0') ?? 0.0;
-          windDir = data['windDir'] ?? "";
-          tideInfo = "Next: ${data['tideStatus']}";
+          windDir = data['windDir'] ?? "--";
+          tideInfo = data['tideStatus'] ?? "No Tide Data";
         }
 
         final verdict = SafetyEngine.getVerdict(isInshore, windSpeed);
