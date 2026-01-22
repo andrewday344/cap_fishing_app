@@ -8,38 +8,42 @@ import '../../widgets/safety_map_card.dart';
 import '../../services/location_service.dart';
 import '../../services/willy_weather_service.dart'; // Ensure this exists
 import 'package:geolocator/geolocator.dart';
-
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   final bool isInshore;
   const DashboardScreen({super.key, required this.isInshore});
 
   @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  // A unique key to force the FutureBuilder to restart
+  Key _refreshKey = UniqueKey();
+
+  void _handleRefresh() {
+    setState(() {
+      _refreshKey = UniqueKey();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return FutureBuilder<Map<String, dynamic>>(
+      key: _refreshKey, // This is the "magic" that triggers the reload
       future: WillyWeatherService().getMarineWeather(),
       builder: (context, weatherSnapshot) {
-        // 1. Initialize data with default placeholders
+        
+        // ... (Keep all your existing Map data and logic here) ...
         Map<String, dynamic> data = {
-          'windKnots': '0.0',
-          'windDir': '--',
-          'currentTide': 'Loading...',
-          'nextTide': '--',
-          'swellHeight': '--',
-          'swellDir': '',
-          'seas': '--',
-          'temp': '--',
+          'windKnots': '0.0', 'windDir': '--', 'currentTide': 'Loading...',
+          'nextTide': '--', 'swellHeight': '--', 'swellDir': '', 'seas': '--', 'temp': '--',
         };
-
-        // 2. Overwrite placeholders if we have real data
         if (weatherSnapshot.hasData) {
           data = weatherSnapshot.data!;
         }
-
-        // 3. Define these variables ONLY ONCE here
         final double windSpeed = double.tryParse(data['windKnots'].toString()) ?? 0.0;
         final String windDir = data['windDir'] ?? "--";
-        
-        final verdict = SafetyEngine.getVerdict(isInshore, windSpeed);
+        final verdict = SafetyEngine.getVerdict(widget.isInshore, windSpeed);
         final statusColor = SafetyEngine.getStatusColor(verdict);
 
         return Scaffold(
@@ -47,13 +51,15 @@ class DashboardScreen extends StatelessWidget {
           appBar: AppBar(
             title: const Text("Seacliff Dashboard"),
             centerTitle: true,
+            leading: IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: "Refresh Weather",
+              onPressed: _handleRefresh, // Triggers the reload
+            ),
             actions: [
               IconButton(
                 icon: const Icon(Icons.history),
-                onPressed: () => Navigator.push(
-                  context, 
-                  MaterialPageRoute(builder: (context) => const LogbookScreen())
-                ),
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const LogbookScreen())),
               ),
             ],
           ),
@@ -61,9 +67,12 @@ class DashboardScreen extends StatelessWidget {
             padding: const EdgeInsets.all(16.0),
             child: Column(
               children: [
-                // Live Wind Gauge
-                _SafetyGauge(windSpeed: windSpeed, color: statusColor, verdict: verdict),
+                // If it's loading, show a small progress bar at the top
+                if (weatherSnapshot.connectionState == ConnectionState.waiting)
+                  const LinearProgressIndicator(minHeight: 2),
                 
+                // ... (Rest of your UI: Gauge, GPS, GridView, etc.) ...
+                _SafetyGauge(windSpeed: windSpeed, color: statusColor, verdict: verdict),
                 const SizedBox(height: 20),
                 const TideCard(), 
                 const SizedBox(height: 12),
