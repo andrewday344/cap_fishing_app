@@ -8,6 +8,8 @@ import '../../widgets/safety_map_card.dart';
 import '../../services/location_service.dart';
 import '../../services/willy_weather_service.dart'; // Ensure this exists
 import 'package:geolocator/geolocator.dart';
+import '../fish_gallery_screen.dart';
+
 class DashboardScreen extends StatefulWidget {
   final bool isInshore;
   const DashboardScreen({super.key, required this.isInshore});
@@ -103,7 +105,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       DataTile(label: "Swell", value: "${data['swellHeight']} ${data['swellDir']}", icon: Icons.waves, color: Colors.indigo),
                       DataTile(label: "Seas", value: data['seas'], icon: Icons.tsunami, color: Colors.blueGrey),
                       DataTile(label: "Temp", value: data['temp'], icon: Icons.thermostat, color: Colors.orange),
-                      const DataTile(label: "Bite Status", value: "High", icon: Icons.phishing, color: Colors.green),
+                      GestureDetector(
+                        onTap: () => Navigator.push(
+                          context, 
+                          MaterialPageRoute(builder: (context) => const FishGalleryScreen())
+                        ),
+                        child: const DataTile(
+                          label: "Fish Gallery", 
+                          value: "Tap to View", 
+                          icon: Icons.set_meal, 
+                          color: Colors.orange
+                        ),
+                      ),
                     ],
                   ),
                 ),
