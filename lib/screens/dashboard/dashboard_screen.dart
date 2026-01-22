@@ -67,7 +67,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             padding: const EdgeInsets.all(16.0),
             child: Column(
               children: [
-                
+
                 // If it's loading, show a small progress bar at the top
                 if (weatherSnapshot.connectionState == ConnectionState.waiting)
                   const LinearProgressIndicator(minHeight: 2),
@@ -95,6 +95,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     crossAxisCount: 2,
                     crossAxisSpacing: 12,
                     mainAxisSpacing: 12,
+                    childAspectRatio: 1.1,
                     children: [
                       DataTile(label: "Wind", value: "${windSpeed.toInt()} kts $windDir", icon: Icons.air, color: Colors.blue),
                       DataTile(label: "Current Tide", value: data['currentTide'], icon: Icons.water, color: Colors.cyan),
