@@ -2,12 +2,12 @@ import '../logbook/logbook_screen.dart';
 import 'package:flutter/material.dart';
 import '../../core/safety_engine.dart';
 import '../../widgets/data_tile.dart';
-//import '../catch_log/catch_log_screen.dart'; // Import the new screen
-//import '../../widgets/tide_card.dart';
+import '../catch_log/catch_log_screen.dart';
+import '../../widgets/tide_card.dart';
 import '../../widgets/safety_map_card.dart';
 import '../../services/location_service.dart';
-import 'package:geolocator/geolocator.dart'; // REQUIRED for the Position type
-import '../../services/willy_weather_service.dart';
+import '../../services/willy_weather_service.dart'; // Ensure this exists
+import 'package:geolocator/geolocator.dart';
 
 class DashboardScreen extends StatelessWidget {
   final bool isInshore;
@@ -15,27 +15,30 @@ class DashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 2. We use a FutureBuilder to wrap the whole screen or just the data parts
     return FutureBuilder<Map<String, dynamic>>(
-      future: WillyWeatherService().getMarineWeather(), // Call the service
+      future: WillyWeatherService().getMarineWeather(),
       builder: (context, weatherSnapshot) {
-        // Add this temporary line to see what's happening on your iPhone:
-        if (weatherSnapshot.hasError) return Center(child: Text("Error: ${weatherSnapshot.error}"));
-        if (!weatherSnapshot.hasData) return const Center(child: CircularProgressIndicator());
+        // 1. Initialize data with default placeholders
+        Map<String, dynamic> data = {
+          'windKnots': '0.0',
+          'windDir': '--',
+          'currentTide': 'Loading...',
+          'nextTide': '--',
+          'swellHeight': '--',
+          'swellDir': '',
+          'seas': '--',
+          'temp': '--',
+        };
 
-        // Default values while loading or on error
-        double windSpeed = 0.0;
-        String windDir = "--";
-        String tideInfo = "Loading...";
-
+        // 2. Overwrite placeholders if we have real data
         if (weatherSnapshot.hasData) {
-          final data = weatherSnapshot.data!;
-          // Make sure these keys match exactly what we returned above!
-          windSpeed = double.tryParse(data['windKnots'] ?? '0') ?? 0.0;
-          windDir = data['windDir'] ?? "--";
-          tideInfo = data['tideStatus'] ?? "No Tide Data";
+          data = weatherSnapshot.data!;
         }
 
+        // 3. Define these variables ONLY ONCE here
+        final double windSpeed = double.tryParse(data['windKnots'].toString()) ?? 0.0;
+        final String windDir = data['windDir'] ?? "--";
+        
         final verdict = SafetyEngine.getVerdict(isInshore, windSpeed);
         final statusColor = SafetyEngine.getStatusColor(verdict);
 
@@ -47,7 +50,10 @@ class DashboardScreen extends StatelessWidget {
             actions: [
               IconButton(
                 icon: const Icon(Icons.history),
-                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const LogbookScreen())),
+                onPressed: () => Navigator.push(
+                  context, 
+                  MaterialPageRoute(builder: (context) => const LogbookScreen())
+                ),
               ),
             ],
           ),
@@ -59,10 +65,10 @@ class DashboardScreen extends StatelessWidget {
                 _SafetyGauge(windSpeed: windSpeed, color: statusColor, verdict: verdict),
                 
                 const SizedBox(height: 20),
-                Text(tideInfo, style: const TextStyle(fontWeight: FontWeight.bold)), 
+                const TideCard(), 
                 const SizedBox(height: 12),
 
-                // YOUR EXISTING GPS STREAM
+                // GPS TRACKER
                 StreamBuilder<Position>(
                   stream: LocationService().getPositionStream(),
                   builder: (context, gpsSnapshot) {
@@ -75,7 +81,7 @@ class DashboardScreen extends StatelessWidget {
 
                 const SizedBox(height: 20),
                 
-                // Weather Data Grid with LIVE WillyWeather values
+                // Weather Data Grid
                 Expanded(
                   child: GridView.count(
                     crossAxisCount: 2,
@@ -83,24 +89,44 @@ class DashboardScreen extends StatelessWidget {
                     mainAxisSpacing: 12,
                     children: [
                       DataTile(label: "Wind", value: "${windSpeed.toInt()} kts $windDir", icon: Icons.air, color: Colors.blue),
-                      DataTile(label: "Tide", value: tideInfo, icon: Icons.water, color: Colors.cyan),
-                      const DataTile(label: "Swell", value: "0.4m", icon: Icons.waves, color: Colors.indigo),
+                      DataTile(label: "Current Tide", value: data['currentTide'], icon: Icons.water, color: Colors.cyan),
+                      DataTile(label: "Next Tide", value: data['nextTide'], icon: Icons.timer, color: Colors.teal),
+                      DataTile(label: "Swell", value: "${data['swellHeight']} ${data['swellDir']}", icon: Icons.waves, color: Colors.indigo),
+                      DataTile(label: "Seas", value: data['seas'], icon: Icons.tsunami, color: Colors.blueGrey),
+                      DataTile(label: "Temp", value: data['temp'], icon: Icons.thermostat, color: Colors.orange),
                       const DataTile(label: "Bite Status", value: "High", icon: Icons.phishing, color: Colors.green),
                     ],
                   ),
                 ),
 
-                // Record Catch Button... (Keep your existing button code here)
+                // Record Catch Button
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16.0),
+                  child: ElevatedButton.icon(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const CatchLogScreen()),
+                    ),
+                    icon: const Icon(Icons.add_circle_outline),
+                    label: const Text("RECORD PRIVATE CATCH", 
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 60),
+                      backgroundColor: const Color(0xFF004E92),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
         );
-      }
+      },
     );
   }
 }
 
-// Private helper for the Gauge
 class _SafetyGauge extends StatelessWidget {
   final double windSpeed;
   final Color color;
@@ -120,7 +146,8 @@ class _SafetyGauge extends StatelessWidget {
         const SizedBox(height: 16),
         CircleAvatar(
           radius: 70,
-          backgroundColor: color.withValues(alpha: 0.1),
+          // UPDATED LINE BELOW:
+          backgroundColor: color.withValues(alpha: 0.1), 
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
