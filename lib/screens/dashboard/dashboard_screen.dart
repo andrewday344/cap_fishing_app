@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/safety_engine.dart';
 import '../../widgets/data_tile.dart';
 import '../catch_log/catch_log_screen.dart';
-import '../../widgets/tide_card.dart';
+//import '../../widgets/tide_card.dart';
 import '../../widgets/safety_map_card.dart';
 import '../../services/location_service.dart';
 import '../../services/willy_weather_service.dart'; // Ensure this exists
@@ -67,6 +67,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             padding: const EdgeInsets.all(16.0),
             child: Column(
               children: [
+                
                 // If it's loading, show a small progress bar at the top
                 if (weatherSnapshot.connectionState == ConnectionState.waiting)
                   const LinearProgressIndicator(minHeight: 2),
@@ -74,8 +75,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 // ... (Rest of your UI: Gauge, GPS, GridView, etc.) ...
                 _SafetyGauge(windSpeed: windSpeed, color: statusColor, verdict: verdict),
                 const SizedBox(height: 20),
-                const TideCard(), 
-                const SizedBox(height: 12),
 
                 // GPS TRACKER
                 StreamBuilder<Position>(
