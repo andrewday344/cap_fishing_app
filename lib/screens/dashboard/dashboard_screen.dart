@@ -9,6 +9,7 @@ import '../../services/location_service.dart';
 import '../../services/willy_weather_service.dart'; // Ensure this exists
 import 'package:geolocator/geolocator.dart';
 import '../fish_gallery_screen.dart';
+import '../wind_detail_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final bool isInshore;
@@ -99,7 +100,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     mainAxisSpacing: 12,
                     childAspectRatio: 1.1,
                     children: [
-                      DataTile(label: "Wind", value: "${windSpeed.toInt()} kts $windDir", icon: Icons.air, color: Colors.blue),
+                      //DataTile(label: "Wind", value: "${windSpeed.toInt()} kts $windDir", icon: Icons.air, color: Colors.blue),
+                      GestureDetector(
+                        onTap: () => Navigator.push(
+                          context, 
+                          MaterialPageRoute(builder: (context) => WindDetailScreen(weatherData: data))
+                        ),
+                        child: DataTile(
+                          label: "Wind", 
+                          value: "${windSpeed.toInt()} kts $windDir", 
+                          icon: Icons.air, 
+                          color: Colors.blue
+                        ),
+                      ),
                       DataTile(label: "Current Tide", value: data['currentTide'], icon: Icons.water, color: Colors.cyan),
                       DataTile(label: "Next Tide", value: data['nextTide'], icon: Icons.timer, color: Colors.teal),
                       DataTile(label: "Swell", value: "${data['swellHeight']} ${data['swellDir']}", icon: Icons.waves, color: Colors.indigo),

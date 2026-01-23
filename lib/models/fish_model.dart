@@ -18,30 +18,14 @@ class Fish {
 
 // Updated list to include the statusColor for specific fish
 List<Fish> saFishGallery = [
-  Fish(
-    name: "King George Whiting", 
-    sizeLimit: "32 cm", 
-    bagLimit: "10 per person"
-  ),
-  Fish(
-    name: "Snapper", 
-    sizeLimit: "38 cm", 
-    bagLimit: "CLOSED (Check PIRSA)", 
-    statusColor: Colors.red // This triggers the warning icon
-  ),
-  Fish(
-    name: "Southern Calamari", 
-    sizeLimit: "No Size Limit", 
-    bagLimit: "15 per person"
-  ),
-  Fish(
-    name: "Garfish", 
-    sizeLimit: "23 cm", 
-    bagLimit: "20 per person"
-  ),
-  Fish(
-    name: "Blue Swimmer Crab", 
-    sizeLimit: "11 cm", 
-    bagLimit: "20 per person"
-  ),
+  Fish(name: "King George Whiting", sizeLimit: "32 cm", bagLimit: "10 (Total 20)"),
+  Fish(name: "Snapper", sizeLimit: "38 cm", bagLimit: "CLOSED", statusColor: Colors.red),
+  Fish(name: "Southern Calamari", sizeLimit: "No Limit", bagLimit: "15 (Total 30)"),
+  Fish(name: "Garfish", sizeLimit: "23 cm", bagLimit: "20 per person"),
+  Fish(name: "Blue Swimmer Crab", sizeLimit: "11 cm", bagLimit: "20 per person"),
+  Fish(name: "Flathead", sizeLimit: "30 cm", bagLimit: "10 per person"),
+  Fish(name: "Silver Trevally", sizeLimit: "24 cm", bagLimit: "20 per person"),
+  Fish(name: "Yellowtail Kingfish", sizeLimit: "60 cm", bagLimit: "2 per person"),
+  Fish(name: "Tommie Ruff", sizeLimit: "No Limit", bagLimit: "20 per person"),
+  Fish(name: "Snook", sizeLimit: "45 cm", bagLimit: "20 per person"),
 ];
