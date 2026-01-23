@@ -7,34 +7,21 @@ class WindDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Note: WillyWeather provides forecast data in a nested structure
-    // This logic assumes you updated the service to include 'forecasts=wind'
+    // 1. Extract the forecast entries from the complex WillyWeather map
+    List<dynamic> entries = [];
+    try {
+      // WillyWeather structure: forecasts -> wind -> days[0] -> entries
+      entries = weatherData['forecasts']['wind']['days'][0]['entries'];
+    } catch (e) {
+      entries = []; // Fallback if data is missing
+    }
+
     return Scaffold(
-      appBar: AppBar(title: const Text("Wind Forecast")),
+      appBar: AppBar(title: const Text("Seacliff Wind Forecast")),
       body: Column(
         children: [
-          // Header with Current Wind
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Colors.blue.shade900, Colors.blue.shade700],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-            width: double.infinity,
-            child: Column(
-              children: [
-                const Text("CURRENTLY AT SEACLIFF", style: TextStyle(color: Colors.white70, letterSpacing: 1.2)),
-                const SizedBox(height: 8),
-                Text("${weatherData['windKnots']} kts", 
-                  style: const TextStyle(color: Colors.white, fontSize: 48, fontWeight: FontWeight.bold)),
-                Text(weatherData['windDir'] ?? "", 
-                  style: const TextStyle(color: Colors.white, fontSize: 20)),
-              ],
-            ),
-          ),
+          // Header showing current conditions
+          _buildCurrentHeader(),
           
           const Padding(
             padding: EdgeInsets.all(16.0),
@@ -42,30 +29,72 @@ class WindDetailScreen extends StatelessWidget {
               children: [
                 Icon(Icons.history_toggle_off, color: Colors.blue),
                 SizedBox(width: 8),
-                Text("HOURLY FORECAST", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                Text("HOURLY FORECAST (KNOTS)", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
               ],
             ),
           ),
 
-          // Forecast List
+          // 2. The Dynamic Forecast List
           Expanded(
-            child: ListView.separated(
-              itemCount: 12, // Show next 12 hours
-              separatorBuilder: (context, index) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                // We will populate this with real forecast data in the next step
-                // For now, it's a clean placeholder for the push test
-                return ListTile(
-                  leading: Text("${DateTime.now().hour + index + 1}:00", 
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
-                  title: const Text("Checking forecast..."),
-                  trailing: const Icon(Icons.air, color: Colors.blueGrey),
-                );
-              },
-            ),
+            child: entries.isEmpty 
+              ? const Center(child: Text("No forecast data available"))
+              : ListView.separated(
+                  itemCount: entries.length,
+                  separatorBuilder: (context, index) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final entry = entries[index];
+                    
+                    // Format the time from the 'dateTime' string
+                    final DateTime time = DateTime.parse(entry['dateTime']);
+                    final String timeLabel = "${time.hour}:00";
+                    
+                    return ListTile(
+                      leading: Container(
+                        width: 60,
+                        alignment: Alignment.centerLeft,
+                        child: Text(timeLabel, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      ),
+                      title: Text("${entry['speed']} kts", style: const TextStyle(fontWeight: FontWeight.w500)),
+                      subtitle: Text(entry['directionText'] ?? ""),
+                      trailing: _getWindIcon(entry['speed']),
+                    );
+                  },
+                ),
           )
         ],
       ),
     );
+  }
+
+  Widget _buildCurrentHeader() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.blue.shade900, Colors.blue.shade700],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      width: double.infinity,
+      child: Column(
+        children: [
+          const Text("CURRENTLY", style: TextStyle(color: Colors.white70, letterSpacing: 1.5)),
+          const SizedBox(height: 8),
+          Text("${weatherData['windKnots']} kts", 
+            style: const TextStyle(color: Colors.white, fontSize: 44, fontWeight: FontWeight.bold)),
+          Text(weatherData['windDir'] ?? "", 
+            style: const TextStyle(color: Colors.white, fontSize: 18)),
+        ],
+      ),
+    );
+  }
+
+  // Visual helper for the list
+  Widget _getWindIcon(dynamic speed) {
+    double s = double.tryParse(speed.toString()) ?? 0.0;
+    if (s > 20) return const Icon(Icons.warning, color: Colors.red);
+    if (s > 15) return const Icon(Icons.air, color: Colors.orange);
+    return const Icon(Icons.check_circle, color: Colors.green);
   }
 }
