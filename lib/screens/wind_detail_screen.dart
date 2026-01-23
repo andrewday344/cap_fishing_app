@@ -9,6 +9,10 @@ class WindDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     // 1. Extract the forecast entries from the complex WillyWeather map
     List<dynamic> entries = [];
+    if (weatherData.containsKey('forecasts') && 
+     weatherData['forecasts'].containsKey('wind')) {
+      entries = weatherData['forecasts']['wind']['days'][0]['entries'];
+    }
     try {
       // WillyWeather structure: forecasts -> wind -> days[0] -> entries
       entries = weatherData['forecasts']['wind']['days'][0]['entries'];
