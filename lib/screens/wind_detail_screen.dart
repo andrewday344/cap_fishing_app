@@ -5,20 +5,18 @@ class WindDetailScreen extends StatelessWidget {
 
   const WindDetailScreen({super.key, required this.weatherData});
 
-  @override
-  Widget build(BuildContext context) {
-    // 1. Extract the forecast entries from the complex WillyWeather map
-    List<dynamic> entries = [];
-    if (weatherData.containsKey('forecasts') && 
-     weatherData['forecasts'].containsKey('wind')) {
-      entries = weatherData['forecasts']['wind']['days'][0]['entries'];
-    }
-    try {
-      // WillyWeather structure: forecasts -> wind -> days[0] -> entries
-      entries = weatherData['forecasts']['wind']['days'][0]['entries'];
-    } catch (e) {
-      entries = []; // Fallback if data is missing
-    }
+@override
+Widget build(BuildContext context) {
+  List<dynamic> entries = [];
+  
+  // A safer way to "dig" through the JSON
+  if (weatherData['forecasts'] != null && 
+      weatherData['forecasts']['wind'] != null &&
+      weatherData['forecasts']['wind']['days'] != null &&
+      weatherData['forecasts']['wind']['days'].isNotEmpty) {
+    
+    entries = weatherData['forecasts']['wind']['days'][0]['entries'] ?? [];
+  }
 
     return Scaffold(
       appBar: AppBar(title: const Text("Seacliff Wind Forecast")),
