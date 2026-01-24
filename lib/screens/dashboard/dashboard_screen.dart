@@ -44,6 +44,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (weatherSnapshot.hasData) {
           data = weatherSnapshot.data!;
         }
+        if (weatherSnapshot.hasData) {
+          data = weatherSnapshot.data!;
+          print("DEBUG DATA: ${data.keys}"); // This tells us if 'forecasts' exists
+        }
         final double windSpeed = double.tryParse(data['windKnots'].toString()) ?? 0.0;
         final String windDir = data['windDir'] ?? "--";
         final verdict = SafetyEngine.getVerdict(widget.isInshore, windSpeed);
