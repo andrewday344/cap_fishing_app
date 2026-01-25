@@ -8,13 +8,18 @@ class WindDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final forecasts = weatherData['forecasts'];
     List<dynamic> entries = [];
     
+
+
     // Using the exact path from your JSON: forecasts -> wind -> days[0] -> entries
     try {
-      if (weatherData['forecasts'] != null && 
-          weatherData['forecasts']['wind'] != null) {
-        entries = weatherData['forecasts']['wind']['days'][0]['entries'] ?? [];
+      if (forecasts != null && forecasts['wind'] != null) {
+        final windData = forecasts['wind'];
+        if (windData['days'] != null && windData['days'].isNotEmpty) {
+          entries = windData['days'][0]['entries'] ?? [];
+        }
       }
     } catch (e) {
       entries = [];
@@ -53,7 +58,7 @@ class WindDetailScreen extends StatelessWidget {
                     
                     // 2. Convert km/h to Knots (multiply by 0.5399)
                     final double speedKmH = double.tryParse(entry['speed'].toString()) ?? 0.0;
-                    final int speedKnots = (speedKmH * 0.5399).round();
+                    final int speedKnots = (speedKmH / 1.852).round(); // Official marine conversion
                     
                     return ListTile(
                       leading: Text(timeLabel, 

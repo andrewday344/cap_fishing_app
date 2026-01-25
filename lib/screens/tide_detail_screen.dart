@@ -7,18 +7,17 @@ class TideDetailScreen extends StatelessWidget {
   const TideDetailScreen({super.key, required this.weatherData});
 
   @override
-  Widget build(BuildContext context) {
-    List<dynamic> tideEntries = [];
+Widget build(BuildContext context) {
+  // Use 'Map.from' to ensure Flutter treats it as a Map
+  final Map<String, dynamic> fullData = Map<String, dynamic>.from(weatherData);
+  List<dynamic> tideEntries = [];
 
-    // Digging into the JSON: forecasts -> tides -> days[0] -> entries
-    try {
-      if (weatherData['forecasts'] != null && 
-          weatherData['forecasts']['tides'] != null) {
-        tideEntries = weatherData['forecasts']['tides']['days'][0]['entries'] ?? [];
-      }
-    } catch (e) {
-      tideEntries = [];
+  if (fullData.containsKey('forecasts') && fullData['forecasts']['tides'] != null) {
+    final days = fullData['forecasts']['tides']['days'] as List;
+    if (days.isNotEmpty) {
+      tideEntries = days[0]['entries'] as List;
     }
+  }
 
     return Scaffold(
       appBar: AppBar(title: const Text("Seacliff Tides")),
