@@ -11,25 +11,29 @@ class TideDetailScreen extends StatelessWidget {
     List<dynamic> tideEntries = [];
     String debugInfo = "";
 
-    // 1. Dig into the JSON structure you provided
-    try {
-      if (weatherData.containsKey('forecasts')) {
-        final forecasts = weatherData['forecasts'];
-        if (forecasts != null && forecasts['tides'] != null) {
-          final tideData = forecasts['tides'];
-          final days = tideData['days'] as List;
-          if (days.isNotEmpty) {
-            tideEntries = days[0]['entries'] as List;
-          }
-        } else {
-          debugInfo = "Forecasts found, but 'tides' key is missing.";
+    // Inside the build method of TideDetailScreen
+try {
+  if (weatherData['forecasts'] != null) {
+    final forecasts = weatherData['forecasts'];
+    
+    // Debug print to see what is actually inside forecasts
+    print("Keys inside forecasts: ${forecasts.keys.toList()}");
+
+      if (forecasts['tides'] != null) {
+        final tidesData = forecasts['tides'];
+        final List days = tidesData['days'] ?? [];
+        if (days.isNotEmpty) {
+          tideEntries = days[0]['entries'] ?? [];
         }
       } else {
-        debugInfo = "The 'forecasts' key is missing entirely from weatherData.";
+        debugInfo = "Tides key missing. Available: ${forecasts.keys.toList()}";
       }
-    } catch (e) {
-      debugInfo = "Error parsing: $e";
+    } else {
+      debugInfo = "Forecasts key is null or missing.";
     }
+  } catch (e) {
+    debugInfo = "Error: $e";
+  }
 
     return Scaffold(
       appBar: AppBar(title: const Text("Seacliff Tides")),

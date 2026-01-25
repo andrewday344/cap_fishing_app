@@ -11,23 +11,21 @@ class WillyWeatherService {
     try {
       final response = await http.get(Uri.parse(url));
       
+      // Inside willy_weather_service.dart
       if (response.statusCode == 200) {
         final Map<String, dynamic> fullJson = json.decode(response.body);
-        
-        // Navigate to the observations block
         final obs = fullJson['observational']['observations'];
-        
+
         return {
-          // Flattening the data for the Dashboard
           'windKnots': (obs['wind']['speed'] / 1.852).round(),
           'windDir': obs['wind']['directionText'],
           'temp': obs['temperature']['temperature'].round(),
           'seas': obs['wave'] != null ? "${obs['wave']['height']}m" : "--",
           
-          // Passing the raw forecast through for Detail Screens
+          // MAKE SURE THIS IS EXACTLY fullJson['forecasts']
           'forecasts': fullJson['forecasts'], 
-        };
-      } else {
+      };
+} else {
         throw Exception('Failed to load weather: ${response.statusCode}');
       }
     } catch (e) {
