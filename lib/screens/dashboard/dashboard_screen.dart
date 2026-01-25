@@ -3,10 +3,9 @@ import 'package:flutter/material.dart';
 import '../../core/safety_engine.dart';
 import '../../widgets/data_tile.dart';
 import '../catch_log/catch_log_screen.dart';
-//import '../../widgets/tide_card.dart';
 import '../../widgets/safety_map_card.dart';
 import '../../services/location_service.dart';
-import '../../services/willy_weather_service.dart'; // Ensure this exists
+import '../../services/willy_weather_service.dart';
 import 'package:geolocator/geolocator.dart';
 import '../fish_gallery_screen.dart';
 import '../wind_detail_screen.dart';
@@ -21,7 +20,6 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  // A unique key to force the FutureBuilder to restart
   Key _refreshKey = UniqueKey();
 
   void _handleRefresh() {
@@ -33,24 +31,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<Map<String, dynamic>>(
-      key: _refreshKey, // This is the "magic" that triggers the reload
+      key: _refreshKey,
       future: WillyWeatherService().getMarineWeather(),
       builder: (context, weatherSnapshot) {
         
-        // ... (Keep all your existing Map data and logic here) ...
+        // 1. Initialize data with default values
         Map<String, dynamic> data = {
-          'windKnots': '0.0', 'windDir': '--', 'currentTide': 'Loading...',
-          'nextTide': '--', 'swellHeight': '--', 'swellDir': '', 'seas': '--', 'temp': '--',
+          'windKnots': 0, 
+          'windDir': '--', 
+          'currentTide': '--',
+          'nextTide': '--', 
+          'swellHeight': '--', 
+          'swellDir': '', 
+          'seas': '--', 
+          'temp': '--',
+          'forecasts': null, // Important: Initialize as null
         };
+
+        // 2. If data is loaded, use it
         if (weatherSnapshot.hasData) {
           data = weatherSnapshot.data!;
         }
-        if (weatherSnapshot.hasData) {
-          data = weatherSnapshot.data!;
-          print("DEBUG DATA: ${data.keys}"); // This tells us if 'forecasts' exists
-        }
-        final double windSpeed = double.tryParse(data['windKnots'].toString()) ?? 0.0;
+
+        // 3. Extract variables safely
+        final dynamic rawWind = data['windKnots'];
+        final double windSpeed = (rawWind is num) ? rawWind.toDouble() : double.tryParse(rawWind.toString()) ?? 0.0;
         final String windDir = data['windDir'] ?? "--";
+        
         final verdict = SafetyEngine.getVerdict(widget.isInshore, windSpeed);
         final statusColor = SafetyEngine.getStatusColor(verdict);
 
@@ -61,8 +68,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             centerTitle: true,
             leading: IconButton(
               icon: const Icon(Icons.refresh),
-              tooltip: "Refresh Weather",
-              onPressed: _handleRefresh, // Triggers the reload
+              onPressed: _handleRefresh,
             ),
             actions: [
               IconButton(
@@ -75,12 +81,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             padding: const EdgeInsets.all(16.0),
             child: Column(
               children: [
-
-                // If it's loading, show a small progress bar at the top
                 if (weatherSnapshot.connectionState == ConnectionState.waiting)
                   const LinearProgressIndicator(minHeight: 2),
                 
-                // ... (Rest of your UI: Gauge, GPS, GridView, etc.) ...
                 _SafetyGauge(windSpeed: windSpeed, color: statusColor, verdict: verdict),
                 const SizedBox(height: 20),
 
@@ -97,7 +100,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                 const SizedBox(height: 20),
                 
-                // Weather Data Grid
                 Expanded(
                   child: GridView.count(
                     crossAxisCount: 2,
@@ -105,7 +107,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     mainAxisSpacing: 12,
                     childAspectRatio: 1.1,
                     children: [
-                      //DataTile(label: "Wind", value: "${windSpeed.toInt()} kts $windDir", icon: Icons.air, color: Colors.blue),
+                      // WIND TILE
                       GestureDetector(
                         onTap: () => Navigator.push(
                           context, 
@@ -118,7 +120,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           color: Colors.blue
                         ),
                       ),
-                      //DataTile(label: "Current Tide", value: data['currentTide'], icon: Icons.water, color: Colors.cyan),
+                      
+                      // TIDE TILE
                       GestureDetector(
                         onTap: () => Navigator.push(
                           context, 
@@ -126,15 +129,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                         child: DataTile(
                           label: "Tide", 
-                          value: "View Details", // Or your current tide value
+                          value: "View Forecast", 
                           icon: Icons.tsunami, 
                           color: Colors.blueAccent
                         ),
                       ),
-                      DataTile(label: "Next Tide", value: data['nextTide'], icon: Icons.timer, color: Colors.teal),
-                      DataTile(label: "Swell", value: "${data['swellHeight']} ${data['swellDir']}", icon: Icons.waves, color: Colors.indigo),
-                      DataTile(label: "Seas", value: data['seas'], icon: Icons.tsunami, color: Colors.blueGrey),
-                      DataTile(label: "Temp", value: data['temp'], icon: Icons.thermostat, color: Colors.orange),
+
+                      DataTile(label: "Next Tide", value: data['nextTide'] ?? '--', icon: Icons.timer, color: Colors.teal),
+                      DataTile(label: "Swell", value: "${data['swellHeight'] ?? '--'} ${data['swellDir'] ?? ''}", icon: Icons.waves, color: Colors.indigo),
+                      DataTile(label: "Seas", value: data['seas'] ?? '--', icon: Icons.tsunami, color: Colors.blueGrey),
+                      DataTile(label: "Temp", value: "${data['temp'] ?? '--'}°C", icon: Icons.thermostat, color: Colors.orange),
+
+                      // FISH GALLERY TILE
                       GestureDetector(
                         onTap: () => Navigator.push(
                           context, 
@@ -142,16 +148,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                         child: const DataTile(
                           label: "Fish Gallery", 
-                          value: "Tap to View", 
+                          value: "Limits & Sizes", 
                           icon: Icons.set_meal, 
-                          color: Colors.orange
+                          color: Colors.green
                         ),
                       ),
                     ],
                   ),
                 ),
 
-                // Record Catch Button
+                // RECORD CATCH BUTTON
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 16.0),
                   child: ElevatedButton.icon(
@@ -188,18 +194,20 @@ class _SafetyGauge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    String message = "STAY INSHORE";
+    if (verdict == SafetyVerdict.go) message = "GOOD TO LAUNCH";
+    if (verdict == SafetyVerdict.caution) message = "PROCEED WITH CAUTION";
+
     return Column(
       children: [
         Text(
-          verdict == SafetyVerdict.go ? "GOOD TO LAUNCH" : 
-          verdict == SafetyVerdict.caution ? "PROCEED WITH CAUTION" : "STAY INSHORE",
+          message,
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)
         ),
         const SizedBox(height: 16),
         CircleAvatar(
           radius: 70,
-          // UPDATED LINE BELOW:
-          backgroundColor: color.withValues(alpha: 0.1), 
+          backgroundColor: color.withOpacity(0.1), 
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
