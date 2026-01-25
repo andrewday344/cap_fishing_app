@@ -2,60 +2,37 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class WillyWeatherService {
-  static const String apiKey = String.fromEnvironment('WILLY_API_KEY');
-  // Seacliff, SA Location ID
-  final String locationId = '9765'; 
+  // Replace this with your actual key
+  final String apiKey = 'MjkzZmUzMTVlYTdhNDIzNjRiZjhjZGy'; 
 
   Future<Map<String, dynamic>> getMarineWeather() async {
-  // 1. Added "swell" to the forecasts list
-  //final url = 'https://corsproxy.io/?https://api.willyweather.com.au/v2/$apiKey/locations/9765/weather.json?observational=true&forecasts=wind,tides,swell';
-  // Inside getMarineWeather() update the URL:
-  //final url = 'https://corsproxy.io/?https://api.willyweather.com.au/v2/$apiKey/locations/9765/weather.json?observational=true&forecasts=wind,tides,swell&days=2';
-  // Inside willy_weather_service.dart
-  //final String url = 'https://corsproxy.io/?https://api.willyweather.com.au/v2/$apiKey/locations/9765/weather.json?observational=true&forecasts=wind,tides,swell&days=2';
-  final String url = 'https://corsproxy.io/?https://api.willyweather.com.au/v2/$apiKey/locations/9765/weather.json?observational=true&forecasts=wind,tides,swell&days=2';
-  try {
-    final response = await http.get(Uri.parse(url));
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      final obs = data['observational']['observations'];
-      
-      // CURRENT DATA
-      double temp = (obs['temperature']['temperature'] as num).toDouble();
-      double windSpeed = (obs['wind']['speed'] as num).toDouble();
-      String windDir = obs['wind']['directionText'];
+    final String url = 'https://corsproxy.io/?https://api.willyweather.com.au/v2/$apiKey/locations/9765/weather.json?observational=true&forecasts=wind,tides,swell&days=2';
 
-      // TIDE LOGIC (Finding Current vs Next)
-      final tideEntries = data['forecasts']['tides']['days'][0]['entries'];
-      final now = DateTime.now();
+    try {
+      final response = await http.get(Uri.parse(url));
       
-      // Find the first tide entry that is AFTER right now
-      var nextTide = tideEntries.firstWhere(
-        (e) => DateTime.parse(e['dateTime']).isAfter(now),
-        orElse: () => tideEntries[0],
-      );
-      
-      // The one before it was the "Current/Last" status
-      int index = tideEntries.indexOf(nextTide);
-      var lastTide = index > 0 ? tideEntries[index - 1] : tideEntries[0];
-
-      // SWELL LOGIC
-      final swellData = data['forecasts']['swell']['days'][0]['entries'][0];
-
-      return {
-        'temp': "${temp.toStringAsFixed(1)}°C",
-        'windKnots': (windSpeed / 1.852).toStringAsFixed(1),
-        'windDir': windDir,
-        'currentTide': lastTide['type'].toUpperCase(),
-        'nextTide': "${nextTide['type'].toUpperCase()} at ${nextTide['dateTime'].split(' ')[1].substring(0, 5)}",
-        'swellHeight': "${swellData['height']}m",
-        'swellDir': swellData['directionText'],
-        'seas': "${(swellData['height'] * 0.7).toStringAsFixed(1)}m", // Estimated local seas
-      };
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> fullJson = json.decode(response.body);
+        
+        // Navigate to the observations block
+        final obs = fullJson['observational']['observations'];
+        
+        return {
+          // Flattening the data for the Dashboard
+          'windKnots': (obs['wind']['speed'] / 1.852).round(),
+          'windDir': obs['wind']['directionText'],
+          'temp': obs['temperature']['temperature'].round(),
+          'seas': obs['wave'] != null ? "${obs['wave']['height']}m" : "--",
+          
+          // Passing the raw forecast through for Detail Screens
+          'forecasts': fullJson['forecasts'], 
+        };
+      } else {
+        throw Exception('Failed to load weather: ${response.statusCode}');
+      }
+    } catch (e) {
+      print("Error fetching weather: $e");
+      rethrow;
     }
-  } catch (e) {
-    return {'error': e.toString()};
-  }
-  return {'error': 'Data missing'};
-}
-}
+  } // <--- This closes the getMarineWeather method
+} // <--- This closes the WillyWeatherService class

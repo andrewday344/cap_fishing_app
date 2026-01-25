@@ -207,7 +207,7 @@ class _SafetyGauge extends StatelessWidget {
         const SizedBox(height: 16),
         CircleAvatar(
           radius: 70,
-          backgroundColor: color.withOpacity(0.1), 
+          backgroundColor: color.withValues(alpha: 0.1), 
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [

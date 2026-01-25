@@ -7,47 +7,62 @@ class TideDetailScreen extends StatelessWidget {
   const TideDetailScreen({super.key, required this.weatherData});
 
   @override
-Widget build(BuildContext context) {
-  // Use 'Map.from' to ensure Flutter treats it as a Map
-  final Map<String, dynamic> fullData = Map<String, dynamic>.from(weatherData);
-  List<dynamic> tideEntries = [];
+  Widget build(BuildContext context) {
+    List<dynamic> tideEntries = [];
+    String debugInfo = "";
 
-  if (fullData.containsKey('forecasts') && fullData['forecasts']['tides'] != null) {
-    final days = fullData['forecasts']['tides']['days'] as List;
-    if (days.isNotEmpty) {
-      tideEntries = days[0]['entries'] as List;
+    // 1. Dig into the JSON structure you provided
+    try {
+      if (weatherData.containsKey('forecasts')) {
+        final forecasts = weatherData['forecasts'];
+        if (forecasts != null && forecasts['tides'] != null) {
+          final tideData = forecasts['tides'];
+          final days = tideData['days'] as List;
+          if (days.isNotEmpty) {
+            tideEntries = days[0]['entries'] as List;
+          }
+        } else {
+          debugInfo = "Forecasts found, but 'tides' key is missing.";
+        }
+      } else {
+        debugInfo = "The 'forecasts' key is missing entirely from weatherData.";
+      }
+    } catch (e) {
+      debugInfo = "Error parsing: $e";
     }
-  }
 
     return Scaffold(
       appBar: AppBar(title: const Text("Seacliff Tides")),
       body: Column(
         children: [
-          _buildTideHeader(tideEntries),
-          const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Text("TODAY'S TIDE TIMES", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey)),
-          ),
+          _buildHeader(),
+          if (tideEntries.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Text(debugInfo, style: const TextStyle(color: Colors.red)),
+            ),
           Expanded(
             child: tideEntries.isEmpty
-                ? const Center(child: Text("No tide data found in response"))
+                ? const Center(child: Text("Waiting for tide data..."))
                 : ListView.builder(
                     itemCount: tideEntries.length,
                     itemBuilder: (context, index) {
                       final entry = tideEntries[index];
+                      // Format: 2026-01-25 02:43:00
                       final DateTime time = DateTime.parse(entry['dateTime']);
-                      final String type = entry['type']?.toUpperCase() ?? "TIDE";
+                      final String type = entry['type'].toString().toUpperCase();
                       
                       return ListTile(
                         leading: Icon(
-                          type == "HIGH" ? Icons.trending_up : Icons.trending_down,
+                          type == "HIGH" ? Icons.expand_less : Icons.expand_more,
                           color: type == "HIGH" ? Colors.blue : Colors.orange,
+                          size: 40,
                         ),
                         title: Text(DateFormat('h:mm a').format(time), 
-                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                        subtitle: Text(type),
+                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                        subtitle: Text(type, style: const TextStyle(fontSize: 16)),
                         trailing: Text("${entry['height']}m", 
-                          style: const TextStyle(fontSize: 18, color: Colors.blueGrey)),
+                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w500)),
                       );
                     },
                   ),
@@ -57,16 +72,16 @@ Widget build(BuildContext context) {
     );
   }
 
-  Widget _buildTideHeader(List tideEntries) {
+  Widget _buildHeader() {
     return Container(
-      padding: const EdgeInsets.all(30),
       width: double.infinity,
-      decoration: BoxDecoration(color: Colors.blue.shade800),
+      padding: const EdgeInsets.all(24),
+      color: Colors.blue.shade900,
       child: const Column(
         children: [
-          Icon(Icons.waves, color: Colors.white, size: 40),
-          SizedBox(height: 10),
-          Text("TIDE FORECAST", style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+          Icon(Icons.waves, color: Colors.white, size: 48),
+          SizedBox(height: 8),
+          Text("DAILY TIDE CHART", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
         ],
       ),
     );
