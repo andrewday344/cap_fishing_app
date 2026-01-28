@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class WillyWeatherService {
-  // Replace this with your actual key
   final String apiKey = 'MjkzZmUzMTVlYTdhNDIzNjRiZjhjZGy'; 
 
   Future<Map<String, dynamic>> getMarineWeather() async {
@@ -11,26 +10,35 @@ class WillyWeatherService {
     try {
       final response = await http.get(Uri.parse(url));
       
-      // Inside willy_weather_service.dart
       if (response.statusCode == 200) {
         final Map<String, dynamic> fullJson = json.decode(response.body);
-        final obs = fullJson['observational']['observations'];
+        
+        // Safety check: Make sure observational data actually exists
+        final obsContainer = fullJson['observational'];
+        final obs = (obsContainer != null) ? obsContainer['observations'] : null;
 
         return {
-          'windKnots': (obs['wind']['speed'] / 1.852).round(),
-          'windDir': obs['wind']['directionText'],
-          'temp': obs['temperature']['temperature'].round(),
-          'seas': obs['wave'] != null ? "${obs['wave']['height']}m" : "--",
+          'windKnots': obs != null ? (obs['wind']['speed'] / 1.852).round() : 0,
+          'windDir': obs != null ? obs['wind']['directionText'] : '--',
+          'temp': obs != null ? obs['temperature']['temperature'].round() : 0,
+          'seas': (obs != null && obs['wave'] != null) ? "${obs['wave']['height']}m" : "--",
           
-          // MAKE SURE THIS IS EXACTLY fullJson['forecasts']
+          // This is the part your Tide Screen needs!
           'forecasts': fullJson['forecasts'], 
-      };
-} else {
+        };
+      } else {
         throw Exception('Failed to load weather: ${response.statusCode}');
       }
     } catch (e) {
       print("Error fetching weather: $e");
-      rethrow;
+      // Return an empty map with forecasts so the app doesn't crash
+      return {
+        'windKnots': 0,
+        'windDir': '--',
+        'temp': 0,
+        'seas': '--',
+        'forecasts': null,
+      };
     }
-  } // <--- This closes the getMarineWeather method
-} // <--- This closes the WillyWeatherService class
+  } 
+}

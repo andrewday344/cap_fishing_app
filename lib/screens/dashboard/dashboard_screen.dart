@@ -51,6 +51,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         // 2. If data is loaded, use it
         if (weatherSnapshot.hasData) {
           data = weatherSnapshot.data!;
+
+          debugPrint("DASHBOARD DATA KEYS: ${data.keys.toList()}");
+          debugPrint("FORECAST DATA EXISTS: ${data['forecasts'] != null}");
         }
 
         // 3. Extract variables safely
@@ -60,6 +63,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         
         final verdict = SafetyEngine.getVerdict(widget.isInshore, windSpeed);
         final statusColor = SafetyEngine.getStatusColor(verdict);
+        
 
         return Scaffold(
           backgroundColor: const Color(0xFFF8FAFC),
@@ -129,7 +133,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                           child: DataTile(
                           label: "Tide", 
-                          value: "View Forecast", 
+                          //value: "View Forecast", 
+                          value: data['forecasts'] != null ? "Ready" : "Missing Forecasts",
                           icon: Icons.tsunami, 
                           color: Colors.blueAccent
                         ),
