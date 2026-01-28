@@ -127,7 +127,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           context, 
                           MaterialPageRoute(builder: (context) => TideDetailScreen(weatherData: data))
                         ),
-                        child: DataTile(
+                          child: DataTile(
                           label: "Tide", 
                           value: "View Forecast", 
                           icon: Icons.tsunami, 
