@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 
 class WillyWeatherService {
-  final String apiKey = 'MjkzZmUzMTVlYTdhNDIzNjRiZjhjZGy'; 
+  final String apiKey = 'MjkzZmUzMTVlYTdhNDIzNjRiZjhjZG'; 
 
   Future<Map<String, dynamic>> getMarineWeather() async {
     // We are wrapping the URL in the AllOrigins proxy
