@@ -1,36 +1,43 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 
 class WillyWeatherService {
-  // Ensure there are NO spaces inside these quotes
   final String apiKey = 'MjkzZmUzMTVlYTdhNDIzNjRiZjhjZGy'; 
 
   Future<Map<String, dynamic>> getMarineWeather() async {
-    // Switched to 'allorigins' proxy - often more stable than 'corsproxy'
-    final String url = 'https://api.allorigins.win/get?url=${Uri.encodeComponent('https://api.willyweather.com.au/v2/$apiKey/locations/9765/weather.json?observational=true&forecasts=wind,tides,swell&days=2')}';
+    // We are wrapping the URL in the AllOrigins proxy
+    final String targetUrl = 'https://api.willyweather.com.au/v2/$apiKey/locations/9765/weather.json?observational=true&forecasts=wind,tides,swell&days=2';
+    final String proxyUrl = 'https://api.allorigins.win/get?url=${Uri.encodeComponent(targetUrl)}';
 
     try {
-      final response = await http.get(Uri.parse(url));
+      final response = await http.get(Uri.parse(proxyUrl));
       
       if (response.statusCode == 200) {
-        // AllOrigins wraps the response in a 'contents' field
         final Map<String, dynamic> wrapper = json.decode(response.body);
-        final Map<String, dynamic> fullJson = json.decode(wrapper['contents']);
         
+        // This is the "Drill Down" step
+        final String rawContents = wrapper['contents'];
+        final Map<String, dynamic> fullJson = json.decode(rawContents);
+        
+        // Check if observations exist
         final obs = fullJson['observational']?['observations'];
+        final forecasts = fullJson['forecasts'];
 
         return {
           'windKnots': obs != null ? (obs['wind']['speed'] / 1.852).round() : 0,
           'windDir': obs != null ? obs['wind']['directionText'] : '--',
           'temp': obs != null ? obs['temperature']['temperature'].round() : 0,
           'seas': (obs != null && obs['wave'] != null) ? "${obs['wave']['height']}m" : "--",
-          'forecasts': fullJson['forecasts'], 
+          'forecasts': forecasts, // Passing the full forecast block
         };
       } else {
-        return _emptyData("Error ${response.statusCode}");
+        debugPrint("Proxy returned status: ${response.statusCode}");
+        return _emptyData("Proxy Error");
       }
     } catch (e) {
-      return _emptyData("Conn Error");
+      debugPrint("Service Catch: $e");
+      return _emptyData("Conn Fail");
     }
   }
 
