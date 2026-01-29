@@ -181,7 +181,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
                 ),
-              ],
+                const SizedBox(height: 10),
+                Text(
+                  "Last Updated: ${data['lastUpdated']}",
+                  style: TextStyle(color: Colors.grey.shade500, fontSize: 12, fontStyle: FontStyle.italic),
+                ),
+                const SizedBox(height: 20),
+                              ],
             ),
           ),
         );

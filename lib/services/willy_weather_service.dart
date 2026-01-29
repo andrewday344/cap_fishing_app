@@ -1,49 +1,55 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:flutter/foundation.dart';
+import 'package:intl/intl.dart';
 
 class WillyWeatherService {
   final String apiKey = 'MjkzZmUzMTVlYTdhNDIzNjRiZjhjZG'; 
 
   Future<Map<String, dynamic>> getMarineWeather() async {
-    // We are wrapping the URL in the AllOrigins proxy
     final String targetUrl = 'https://api.willyweather.com.au/v2/$apiKey/locations/9765/weather.json?observational=true&forecasts=wind,tides,swell&days=2';
     final String proxyUrl = 'https://api.allorigins.win/get?url=${Uri.encodeComponent(targetUrl)}';
 
     try {
       final response = await http.get(Uri.parse(proxyUrl));
-      
       if (response.statusCode == 200) {
         final Map<String, dynamic> wrapper = json.decode(response.body);
+        final Map<String, dynamic> fullJson = json.decode(wrapper['contents']);
         
-        // This is the "Drill Down" step
-        final String rawContents = wrapper['contents'];
-        final Map<String, dynamic> fullJson = json.decode(rawContents);
-        
-        // Check if observations exist
         final obs = fullJson['observational']?['observations'];
         final forecasts = fullJson['forecasts'];
 
+        // FALLBACK LOGIC: If real-time (obs) is null, use the first forecast entry
+        var windSpeed = 0.0;
+        var windDir = '--';
+        
+        if (obs != null) {
+          windSpeed = (obs['wind']['speed'] as num).toDouble();
+          windDir = obs['wind']['directionText'];
+        } else if (forecasts != null && forecasts['wind'] != null) {
+          // Grab the first forecast entry of the first day
+          final firstForecast = forecasts['wind']['days'][0]['entries'][0];
+          windSpeed = (firstForecast['speed'] as num).toDouble();
+          windDir = firstForecast['directionText'];
+        }
+
         return {
-          'windKnots': obs != null ? (obs['wind']['speed'] / 1.852).round() : 0,
-          'windDir': obs != null ? obs['wind']['directionText'] : '--',
-          'temp': obs != null ? obs['temperature']['temperature'].round() : 0,
-          'seas': (obs != null && obs['wave'] != null) ? "${obs['wave']['height']}m" : "--",
-          'forecasts': forecasts, // Passing the full forecast block
+          'windKnots': (windSpeed / 1.852).round(),
+          'windDir': windDir,
+          'temp': obs != null ? obs['temperature']['temperature'].round() : 20,
+          'seas': (obs != null && obs['wave'] != null) ? "${obs['wave']['height']}m" : "0.5m",
+          'forecasts': forecasts,
+          'lastUpdated': DateFormat('h:mm a').format(DateTime.now()), // ADDED THIS
         };
-      } else {
-        debugPrint("Proxy returned status: ${response.statusCode}");
-        return _emptyData("Proxy Error");
       }
+      return _emptyData("API Down");
     } catch (e) {
-      debugPrint("Service Catch: $e");
-      return _emptyData("Conn Fail");
+      return _emptyData("Conn Error");
     }
   }
 
   Map<String, dynamic> _emptyData(String msg) {
     return {
-      'windKnots': 0, 'windDir': msg, 'temp': 0, 'seas': '--', 'forecasts': null,
+      'windKnots': 0, 'windDir': msg, 'temp': 0, 'seas': '--', 'forecasts': null, 'lastUpdated': '--',
     };
   }
 }
