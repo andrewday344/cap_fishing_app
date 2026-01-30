@@ -7,9 +7,10 @@ class WillyWeatherService {
   final String apiKey = 'MjkzZmUzMTVlYTdhNDIzNjRiZjhjZG'; 
 
   Future<Map<String, dynamic>> getMarineWeather() async {
-    final String targetUrl = 'https://api.willyweather.com.au/v2/$apiKey/locations/9765/weather.json?observational=true&forecasts=wind,tides,swell&days=2';
+    final String proxyUrl = 'https://api.willyweather.com.au/v2/MjkzZmUzMTVlYTdhNDIzNjRiZjhjZG/locations/9765/weather.json?observational=true&forecasts=wind,tides,swell&days=2';
+    
     // Using AllOrigins to bypass the 403 Domain Lock issues common in development
-    final String proxyUrl = 'https://api.allorigins.win/get?url=${Uri.encodeComponent(targetUrl)}';
+    //final String proxyUrl = 'https://api.allorigins.win/get?url=${Uri.encodeComponent(targetUrl)}';
 
     try {
       final response = await http.get(Uri.parse(proxyUrl)).timeout(const Duration(seconds: 10));
