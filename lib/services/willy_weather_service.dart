@@ -3,30 +3,21 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
 class WillyWeatherService {
-  // Exact key from your screenshot: No 'y', ends in ZG
+  // Your confirmed key from the screenshot
   final String apiKey = 'MjkzZmUzMTVlYTdhNDIzNjRiZjhjZG'; 
 
   Future<Map<String, dynamic>> getMarineWeather() async {
-    final String proxyUrl = 'https://api.willyweather.com.au/v2/MjkzZmUzMTVlYTdhNDIzNjRiZjhjZG/locations/9765/weather.json?observational=true&forecasts=wind,tides,swell&days=2';
-    
-    // Using AllOrigins to bypass the 403 Domain Lock issues common in development
-    //final String proxyUrl = 'https://api.allorigins.win/get?url=${Uri.encodeComponent(targetUrl)}';
+    // DIRECT URL (No proxy)
+    final String url = 'https://api.willyweather.com.au/v2/$apiKey/locations/9765/weather.json?observational=true&forecasts=wind,tides,swell&days=2';
 
     try {
-      final response = await http.get(Uri.parse(proxyUrl)).timeout(const Duration(seconds: 10));
+      // Direct call to WillyWeather
+      final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
       
       if (response.statusCode == 200) {
-        final Map<String, dynamic> wrapper = json.decode(response.body);
+        final Map<String, dynamic> fullJson = json.decode(response.body);
         
-        // AllOrigins puts the weather data inside a string called 'contents'
-        final String rawContents = wrapper['contents'];
-        final Map<String, dynamic> fullJson = json.decode(rawContents);
-        
-        // If the API itself returns an error (like 403), it will be inside 'contents'
-        if (fullJson['error'] != null) {
-          return _emptyData("API: ${fullJson['error']}");
-        }
-
+        // No need to unwrap 'contents' anymore!
         final obs = fullJson['observational']?['observations'];
         final forecasts = fullJson['forecasts'];
 
@@ -64,11 +55,11 @@ class WillyWeatherService {
           'lastUpdated': DateFormat('h:mm a').format(DateTime.now()),
         };
       } else {
-        return _emptyData("HTTP ${response.statusCode}");
+        // If it's still 403, we know the "URL" setting in your API panel is the issue
+        return _emptyData("Error ${response.statusCode}");
       }
     } catch (e) {
-      // Shows the specific error (e.g., FormatException if proxy sends back junk)
-      return _emptyData("Error: ${e.toString().split(':').first}");
+      return _emptyData("Check Internet");
     }
   }
 
