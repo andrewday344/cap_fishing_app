@@ -134,14 +134,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           child: DataTile(
                           label: "Tide", 
                           //value: "View Forecast", 
-                          value: data['forecasts'] != null ? "Ready" : "Missing Forecasts",
+                          //value: data['forecasts'] != null ? "Ready" : "Missing Forecasts",
+                          value: data['forecasts'] != null ? "View Details" : "Loading...",
                           icon: Icons.tsunami, 
                           color: Colors.blueAccent
                         ),
                       ),
 
                       DataTile(label: "Next Tide", value: data['nextTide'] ?? '--', icon: Icons.timer, color: Colors.teal),
-                      DataTile(label: "Swell", value: "${data['swellHeight'] ?? '--'} ${data['swellDir'] ?? ''}", icon: Icons.waves, color: Colors.indigo),
+                      DataTile(label: "Swell", value: "${data['swellHeight']} ${data['swellDir']}", icon: Icons.waves, color: Colors.indigo),
                       DataTile(label: "Seas", value: data['seas'] ?? '--', icon: Icons.tsunami, color: Colors.blueGrey),
                       DataTile(label: "Temp", value: "${data['temp'] ?? '--'}°C", icon: Icons.thermostat, color: Colors.orange),
 

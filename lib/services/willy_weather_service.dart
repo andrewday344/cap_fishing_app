@@ -18,27 +18,41 @@ class WillyWeatherService {
         final obs = fullJson['observational']?['observations'];
         final forecasts = fullJson['forecasts'];
 
-        // FALLBACK LOGIC: If real-time (obs) is null, use the first forecast entry
-        var windSpeed = 0.0;
-        var windDir = '--';
-        
-        if (obs != null) {
-          windSpeed = (obs['wind']['speed'] as num).toDouble();
-          windDir = obs['wind']['directionText'];
-        } else if (forecasts != null && forecasts['wind'] != null) {
-          // Grab the first forecast entry of the first day
-          final firstForecast = forecasts['wind']['days'][0]['entries'][0];
-          windSpeed = (firstForecast['speed'] as num).toDouble();
-          windDir = firstForecast['directionText'];
+        // --- SWELL EXTRACTION ---
+        String swellHeight = "--";
+        String swellDir = "";
+        if (forecasts != null && forecasts['swell'] != null) {
+          final firstSwell = forecasts['swell']['days'][0]['entries'][0];
+          swellHeight = "${firstSwell['height']}m";
+          swellDir = firstSwell['directionText'];
+        }
+
+        // --- NEXT TIDE EXTRACTION ---
+        String nextTideTime = "--";
+        if (forecasts != null && forecasts['tides'] != null) {
+          final tideEntries = forecasts['tides']['days'][0]['entries'] as List;
+          final now = DateTime.now();
+          
+          // Find the first tide entry that happens AFTER now
+          for (var entry in tideEntries) {
+            DateTime tideTime = DateTime.parse(entry['dateTime']);
+            if (tideTime.isAfter(now)) {
+              nextTideTime = DateFormat('h:mm a').format(tideTime);
+              break; 
+            }
+          }
         }
 
         return {
-          'windKnots': (windSpeed / 1.852).round(),
-          'windDir': windDir,
-          'temp': obs != null ? obs['temperature']['temperature'].round() : 20,
+          'windKnots': obs != null ? (obs['wind']['speed'] / 1.852).round() : 0,
+          'windDir': obs != null ? obs['wind']['directionText'] : '--',
+          'temp': obs != null ? obs['temperature']['temperature'].round() : 0,
           'seas': (obs != null && obs['wave'] != null) ? "${obs['wave']['height']}m" : "0.5m",
+          'swellHeight': swellHeight,
+          'swellDir': swellDir,
+          'nextTide': nextTideTime,
           'forecasts': forecasts,
-          'lastUpdated': DateFormat('h:mm a').format(DateTime.now()), // ADDED THIS
+          'lastUpdated': DateFormat('h:mm a').format(DateTime.now()),
         };
       }
       return _emptyData("API Down");
@@ -49,7 +63,9 @@ class WillyWeatherService {
 
   Map<String, dynamic> _emptyData(String msg) {
     return {
-      'windKnots': 0, 'windDir': msg, 'temp': 0, 'seas': '--', 'forecasts': null, 'lastUpdated': '--',
+      'windKnots': 0, 'windDir': msg, 'temp': 0, 'seas': '--', 
+      'swellHeight': '--', 'swellDir': '', 'nextTide': '--',
+      'forecasts': null, 'lastUpdated': '--',
     };
   }
 }
