@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io'; // Needed for SocketException
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
@@ -14,41 +13,52 @@ class WillyWeatherService {
       
       if (response.statusCode == 200) {
         final Map<String, dynamic> fullJson = json.decode(response.body);
+        
+        // --- OBSERVATIONAL DATA (Real-time) ---
         final obs = fullJson['observational']?['observations'];
         final forecasts = fullJson['forecasts'];
+
+        // --- SWELL EXTRACTION ---
+        String swellHeight = "--";
+        String swellDir = "";
+        if (forecasts != null && forecasts['swell'] != null) {
+          final firstSwell = forecasts['swell']['days'][0]['entries'][0];
+          swellHeight = "${firstSwell['height']}m";
+          swellDir = firstSwell['directionText'];
+        }
 
         return {
           'windKnots': obs != null ? (obs['wind']['speed'] / 1.852).round() : 0,
           'windDir': obs != null ? obs['wind']['directionText'] : '--',
           'temp': obs != null ? obs['temperature']['temperature'].round() : 0,
-          'seas': (obs != null && obs['wave'] != null) ? "${obs['wave']['height']}m" : "--",
-          'swellHeight': forecasts?['swell']?['days'][0]['entries'][0]['height'].toString() ?? "--",
-          'swellDir': forecasts?['swell']?['days'][0]['entries'][0]['directionText'] ?? "",
+          'seas': swellHeight, // Using swell height as a proxy for sea state
+          'swellHeight': swellHeight,
+          'swellDir': swellDir,
           'nextTide': _getNextTide(forecasts),
           'forecasts': forecasts,
           'lastUpdated': DateFormat('h:mm a').format(DateTime.now()),
         };
       } else {
-        // This captures 401, 403, etc.
         return _emptyData("Status: ${response.statusCode}");
       }
-    } on SocketException {
-      return _emptyData("Network: No Path");
-    } on HandshakeException {
-      return _emptyData("Security Block");
     } catch (e) {
-      // This shows the actual error string on your iPhone
-      return _emptyData(e.toString().split(':').last.trim());
+      // If this triggers, the app is being blocked by local permissions
+      return _emptyData("Blocked: Check Permissions");
     }
   }
 
   String _getNextTide(dynamic forecasts) {
     if (forecasts == null || forecasts['tides'] == null) return "--";
-    final tideEntries = forecasts['tides']['days'][0]['entries'] as List;
+    final List days = forecasts['tides']['days'];
     final now = DateTime.now();
-    for (var entry in tideEntries) {
-      if (DateTime.parse(entry['dateTime']).isAfter(now)) {
-        return DateFormat('h:mm a').format(DateTime.parse(entry['dateTime']));
+
+    for (var day in days) {
+      final List entries = day['entries'];
+      for (var entry in entries) {
+        DateTime tideTime = DateTime.parse(entry['dateTime']);
+        if (tideTime.isAfter(now)) {
+          return "${DateFormat('h:mm a').format(tideTime)} (${entry['type']})";
+        }
       }
     }
     return "--";
