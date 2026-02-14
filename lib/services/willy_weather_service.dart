@@ -7,7 +7,7 @@ class WillyWeatherService {
 
   Future<Map<String, dynamic>> getMarineWeather() async {
     // We add forecasts for wind, tides, and swell back in
-    final String targetUrl = 'https://api.willyweather.com.au/v2/$apiKey/locations/9765/weather.json?observational=true&forecasts=wind,tides,swell&days=2';
+    final String targetUrl = 'https://api.willyweather.com.au/v2/$apiKey/locations/9765/weather.json?observational=true&forecasts=wind,tides,swell&days=7';
     final String proxyUrl = 'https://corsproxy.io/?${Uri.encodeComponent(targetUrl)}';
 
     try {

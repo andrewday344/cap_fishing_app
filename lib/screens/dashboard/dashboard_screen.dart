@@ -10,6 +10,8 @@ import 'package:geolocator/geolocator.dart';
 import '../fish_gallery_screen.dart';
 import '../wind_detail_screen.dart';
 import '../tide_detail_screen.dart';
+import '../wind_forecast_screen.dart'; // <--- ADD THIS IMPORT
+import 'package:intl/intl.dart';
 
 class DashboardScreen extends StatefulWidget {
   final bool isInshore;
@@ -45,15 +47,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           'swellDir': '', 
           'seas': '--', 
           'temp': '--',
-          'forecasts': null, // Important: Initialize as null
+          'forecasts': null,
         };
 
         // 2. If data is loaded, use it
         if (weatherSnapshot.hasData) {
           data = weatherSnapshot.data!;
-
-          debugPrint("DASHBOARD DATA KEYS: ${data.keys.toList()}");
-          debugPrint("FORECAST DATA EXISTS: ${data['forecasts'] != null}");
         }
 
         // 3. Extract variables safely
@@ -63,7 +62,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         
         final verdict = SafetyEngine.getVerdict(widget.isInshore, windSpeed);
         final statusColor = SafetyEngine.getStatusColor(verdict);
-        
 
         return Scaffold(
           backgroundColor: const Color(0xFFF8FAFC),
@@ -111,16 +109,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     mainAxisSpacing: 12,
                     childAspectRatio: 1.1,
                     children: [
-                      // WIND TILE
+                      // WIND TILE (Now Tappable to open Forecast)
                       GestureDetector(
-                        onTap: () => Navigator.push(
-                          context, 
-                          MaterialPageRoute(builder: (context) => WindDetailScreen(weatherData: data))
-                        ),
+                        onTap: () {
+                          if (data['forecasts'] != null) {
+                            Navigator.push(
+                              context, 
+                              MaterialPageRoute(
+                                builder: (context) => WindForecastScreen(forecastData: data['forecasts'])
+                              )
+                            );
+                          }
+                        },
                         child: DataTile(
-                          label: "Wind", 
+                          label: "Wind Trend", 
                           value: "${windSpeed.toInt()} kts $windDir", 
-                          icon: Icons.air, 
+                          icon: Icons.insights, // Changed icon to suggest a graph
                           color: Colors.blue
                         ),
                       ),
@@ -131,11 +135,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           context, 
                           MaterialPageRoute(builder: (context) => TideDetailScreen(weatherData: data))
                         ),
-                          child: DataTile(
-                          label: "Tide", 
-                          //value: "View Forecast", 
-                          //value: data['forecasts'] != null ? "Ready" : "Missing Forecasts",
-                          value: data['forecasts'] != null ? "View Details" : "Loading...",
+                        child: DataTile(
+                          label: "Tide Details", 
+                          value: data['forecasts'] != null ? "View Forecast" : "Loading...",
                           icon: Icons.tsunami, 
                           color: Colors.blueAccent
                         ),
@@ -143,7 +145,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                       DataTile(label: "Next Tide", value: data['nextTide'] ?? '--', icon: Icons.timer, color: Colors.teal),
                       DataTile(label: "Swell", value: "${data['swellHeight']} ${data['swellDir']}", icon: Icons.waves, color: Colors.indigo),
-                      DataTile(label: "Seas", value: data['seas'] ?? '--', icon: Icons.tsunami, color: Colors.blueGrey),
+                      DataTile(label: "Seas", value: data['seas'] ?? '--', icon: Icons.water, color: Colors.blueGrey),
                       DataTile(label: "Temp", value: "${data['temp'] ?? '--'}°C", icon: Icons.thermostat, color: Colors.orange),
 
                       // FISH GALLERY TILE
@@ -182,9 +184,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 10),
+                
                 Text(
-                  "Last Updated: ${data['lastUpdated']}",
+                  "Last Updated: ${data['lastUpdated'] ?? '--'}",
                   style: TextStyle(color: Colors.grey.shade500, fontSize: 12, fontStyle: FontStyle.italic),
                 ),
                 const SizedBox(height: 20),
@@ -196,6 +198,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 }
+
+// Keep your _SafetyGauge class below...
 
 class _SafetyGauge extends StatelessWidget {
   final double windSpeed;
