@@ -5,21 +5,21 @@ class WillyWeatherService {
   final String apiKey = 'MjkzZmUzMTVlYTdhNDIzNjRiZjhjZG'; 
 
   Future<Map<String, dynamic>> getMarineWeather() async {
-    final String url = 'https://api.willyweather.com.au/v2/$apiKey/locations/9765/weather.json?observational=true';
+    // We wrap the WillyWeather URL inside a CORS proxy
+    // This tells the proxy: "Fetch this for me and add the 'Allow' headers"
+    final String targetUrl = 'https://api.willyweather.com.au/v2/$apiKey/locations/9765/weather.json?observational=true';
+    final String proxyUrl = 'https://corsproxy.io/?${Uri.encodeComponent(targetUrl)}';
 
     try {
-      final response = await http.get(
-        Uri.parse(url),
-        headers: {
-          // This tells WillyWeather "I am a normal Safari browser"
-          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1',
-          'Accept': 'application/json',
-        },
-      ).timeout(const Duration(seconds: 10));
+      final response = await http.get(Uri.parse(proxyUrl)).timeout(const Duration(seconds: 10));
       
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
-        final obs = data['observational']?['observations'];
+        
+        // Safety check to ensure the JSON structure exists
+        if (data['observational'] == null) return _emptyData("No Data");
+        
+        final obs = data['observational']['observations'];
 
         return {
           'windKnots': (obs['wind']['speed'] / 1.852).round(),
@@ -28,17 +28,16 @@ class WillyWeatherService {
           'seas': '--', 
           'swellHeight': '--',
           'swellDir': '',
-          'nextTide': '--',
+          'nextTide': 'Ready',
           'forecasts': null,
           'lastUpdated': 'Updated',
         };
       } else {
-        // If it's a 403 or 401, it's a WillyWeather permission issue
-        return _emptyData("Status ${response.statusCode}");
+        return _emptyData("Server Err: ${response.statusCode}");
       }
     } catch (e) {
-      // If it still says "Blocked", we will show the actual error name
-      return _emptyData("Err: ${e.runtimeType}");
+      // This catches the 'minified' errors and gives us a readable hint
+      return _emptyData("Connection Error");
     }
   }
 
