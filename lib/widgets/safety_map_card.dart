@@ -8,7 +8,7 @@ class SafetyMapCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     double kms = distanceInMeters / 1000;
-    bool isTooFar = kms > 1.0; // Warning if > 5km from Seacliff
+    bool isTooFar = kms > 3.7; // Warning if > 5km from Seacliff
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -37,7 +37,7 @@ class SafetyMapCard extends StatelessWidget {
             ),
           ),
           Text(
-            isTooFar ? "OUTSIDE RANGE" : "SAFE RANGE",
+            isTooFar ? "OUTSIDE SMALL BOAT RANGE" : "SMALL BOAT SAFE RANGE",
             style: TextStyle(
               color: isTooFar ? Colors.red : Colors.green,
               fontWeight: FontWeight.bold,
