@@ -20,7 +20,7 @@ class WindForecastScreen extends StatelessWidget {
       backgroundColor: const Color(0xFF0F172A), // Dark Navy
       appBar: AppBar(
         title: const Text("Wind Forecast - Seacliff"),
-        backgroundColor: const Color.fromARGB(0, 243, 240, 240),
+        backgroundColor: const Color.fromARGB(0, 247, 246, 246),
         elevation: 0,
       ),
       body: Column(
