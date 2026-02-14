@@ -8,7 +8,7 @@ class SafetyMapCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     double kms = distanceInMeters / 1000;
-    bool isTooFar = kms > 2.0; // Warning if > 5km from Seacliff
+    bool isTooFar = kms > 1.0; // Warning if > 5km from Seacliff
 
     return Container(
       padding: const EdgeInsets.all(16),
