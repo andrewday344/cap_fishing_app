@@ -63,7 +63,7 @@ class WindDetailScreen extends StatelessWidget {
                     return ListTile(
                       leading: Text(timeLabel, 
                         style: const TextStyle(fontWeight: FontWeight.bold)),
-                      title: Text("$speedKnots ktss", 
+                      title: Text("$speedKnots kts", 
                         style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
                       subtitle: Text(entry['directionText'] ?? ""),
                       trailing: _getWindIcon(speedKnots),
