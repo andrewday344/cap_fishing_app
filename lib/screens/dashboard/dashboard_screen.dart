@@ -8,10 +8,9 @@ import '../../services/location_service.dart';
 import '../../services/willy_weather_service.dart';
 import 'package:geolocator/geolocator.dart';
 import '../fish_gallery_screen.dart';
-import '../wind_detail_screen.dart';
 import '../tide_detail_screen.dart';
 import '../wind_forecast_screen.dart'; // <--- ADD THIS IMPORT
-import 'package:intl/intl.dart';
+
 
 class DashboardScreen extends StatefulWidget {
   final bool isInshore;
