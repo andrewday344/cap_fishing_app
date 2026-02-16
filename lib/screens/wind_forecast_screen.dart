@@ -12,7 +12,7 @@ class WindForecastScreen extends StatefulWidget {
 
 class _WindForecastScreenState extends State<WindForecastScreen> {
   int _daysToShow = 1;
-  int? _hoverIndex; // Tracks which data point the user is touching
+  int? _hoverIndex;
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +36,6 @@ class _WindForecastScreenState extends State<WindForecastScreen> {
       body: Column(
         children: [
           const SizedBox(height: 15),
-          // Day Toggles
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [1, 3, 5].map((day) => Padding(
@@ -45,20 +44,17 @@ class _WindForecastScreenState extends State<WindForecastScreen> {
                 label: Text("$day-Day"),
                 selected: _daysToShow == day,
                 onSelected: (selected) {
-                if (selected) {
-                  setState(() {
-                    _daysToShow = day;
-                    _hoverIndex = null;
-                  });
-                }
+                  if (selected) {
+                    setState(() {
+                      _daysToShow = day;
+                      _hoverIndex = null;
+                    });
+                  }
                 },
               ),
             )).toList(),
           ),
-
           const SizedBox(height: 20),
-
-          // THE INTERACTIVE GRAPH AREA
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10),
             child: Stack(
@@ -79,14 +75,11 @@ class _WindForecastScreenState extends State<WindForecastScreen> {
                     ),
                   ),
                 ),
-                
-                // FLOATING TOOLTIP
                 if (_hoverIndex != null && _hoverIndex! < allEntries.length)
                   _buildTooltip(allEntries[_hoverIndex!]),
               ],
             ),
           ),
-          
           const Spacer(),
           const Padding(
             padding: EdgeInsets.all(20.0),
@@ -99,7 +92,7 @@ class _WindForecastScreenState extends State<WindForecastScreen> {
   }
 
   void _handleTouch(Offset localPosition, List<dynamic> entries, BuildContext context) {
-    double chartWidth = MediaQuery.of(context).size.width - 20; // Subtract padding
+    double chartWidth = MediaQuery.of(context).size.width - 20;
     double stepX = chartWidth / (entries.length - 1);
     
     int index = (localPosition.dx / stepX).round();
@@ -112,7 +105,6 @@ class _WindForecastScreenState extends State<WindForecastScreen> {
     final date = DateTime.parse(entry['dateTime']);
     final knots = (entry['speed'] / 1.852).round();
     final dir = entry['directionText'];
-    
     String severity = knots < 10 ? "Light" : (knots < 18 ? "Moderate" : "Fresh");
 
     return Positioned(
@@ -121,7 +113,7 @@ class _WindForecastScreenState extends State<WindForecastScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: Colors.blue.withValues(alpha: 0.05),
+          color: Colors.black.withValues(alpha: 0.8),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(
@@ -148,7 +140,6 @@ class InteractiveWillyPainter extends CustomPainter {
     final linePath = Path();
     final fillPath = Path();
     
-    // 1. Draw Background Grid & Lines
     for (int i = 0; i < entries.length; i++) {
       double wind = (entries[i]['speed'] / 1.852);
       double x = i * stepX;
@@ -169,34 +160,26 @@ class InteractiveWillyPainter extends CustomPainter {
       }
     }
 
-    canvas.drawPath(fillPath, Paint()..color = Colors.black.withValues(alpha: 0.8));
+    canvas.drawPath(fillPath, Paint()..color = Colors.blue.withValues(alpha: 0.05));
     canvas.drawPath(linePath, Paint()..color = Colors.blue.shade300..strokeWidth = 2..style = PaintingStyle.stroke);
 
-    // 2. Draw Colored Arrows along the line
     for (int i = 0; i < entries.length; i++) {
-      // Only draw arrows every few points to avoid clutter on 5-day view
       if (entries.length > 50 && i % 2 != 0) continue; 
-
       double wind = (entries[i]['speed'] / 1.852);
       double x = i * stepX;
       double y = size.height - (wind / maxWind * size.height);
-      
       _drawArrow(canvas, x, y, entries[i]['directionText'], wind);
     }
 
-    // 3. Draw Vertical "Hover" Line
     if (hoverIndex != null) {
       double hoverX = hoverIndex! * stepX;
       canvas.drawLine(Offset(hoverX, 0), Offset(hoverX, size.height), 
         Paint()..color = Colors.blue..strokeWidth = 1);
-      canvas.drawCircle(Offset(hoverX, size.height - ((entries[hoverIndex!]['speed'] / 1.852) / maxWind * size.height)), 
-        5, Paint()..color = Colors.blue);
     }
   }
 
   void _drawArrow(Canvas canvas, double x, double y, String dir, double speed) {
     Color arrowColor = speed < 10 ? Colors.green : (speed < 18 ? Colors.lightBlue : Colors.orange);
-    
     Map<String, double> directions = {'N': 0, 'NE': 45, 'E': 90, 'SE': 135, 'S': 180, 'SW': 225, 'W': 270, 'NW': 315};
     double angle = (directions[dir.toUpperCase().substring(0, math.min(dir.length, 2))] ?? 0) * (math.pi / 180);
 
@@ -204,13 +187,7 @@ class InteractiveWillyPainter extends CustomPainter {
     canvas.translate(x, y);
     canvas.rotate(angle);
     
-    final path = Path()
-      ..moveTo(0, -7)
-      ..lineTo(4, 3)
-      ..lineTo(0, 1)
-      ..lineTo(-4, 3)
-      ..close();
-
+    final path = Path()..moveTo(0, -7)..lineTo(4, 3)..lineTo(0, 1)..lineTo(-4, 3)..close();
     canvas.drawPath(path, Paint()..color = arrowColor);
     canvas.restore();
   }
