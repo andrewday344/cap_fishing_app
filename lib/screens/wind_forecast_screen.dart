@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 class WindForecastScreen extends StatefulWidget {
   final Map<String, dynamic> forecastData;
@@ -17,47 +18,34 @@ class _WindForecastScreenState extends State<WindForecastScreen> {
   @override
   Widget build(BuildContext context) {
     List<dynamic> allEntries = [];
-    String topDateLabel = "";
-    
+    List<Map<String, dynamic>> dayBoundaries = [];
+
     try {
-      allEntries.addAll(widget.forecastData['wind']['days'][0]['entries']);
-      // Formats the header date: Mon 16 Feb
-      topDateLabel = DateFormat('E d MMM').format(DateTime.parse(allEntries[0]['dateTime']));
-      
-      if (_daysToShow > 1) {
-        for (int i = 1; i < _daysToShow; i++) {
-          allEntries.addAll(widget.forecastData['wind']['days'][i]['entries']);
-        }
+      for (int i = 0; i < _daysToShow; i++) {
+        var dayData = widget.forecastData['wind']['days'][i];
+        // Record where each day starts for the painter
+        dayBoundaries.add({
+          'startIndex': allEntries.length,
+          'label': DateFormat('E d MMM').format(DateTime.parse(dayData['entries'][0]['dateTime'])),
+        });
+        allEntries.addAll(dayData['entries']);
       }
     } catch (e) {
-      return const Scaffold(body: Center(child: Text("Data missing")));
+      return const Scaffold(body: Center(child: Text("Data limited to 2 days")));
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC), // Very light grey background
+      backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
-        title: const Text("Seacliff Wind", style: TextStyle(color: Colors.black87, fontSize: 18)),
+        title: const Text("Seacliff Wind Forecast", style: TextStyle(color: Colors.black87, fontSize: 18)),
         backgroundColor: Colors.white,
-        elevation: 0,
+        elevation: 1,
         iconTheme: const IconThemeData(color: Colors.blue),
       ),
       body: Column(
         children: [
-          // 1. DATE HEADER
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            color: Colors.white,
-            child: Text(
-              topDateLabel,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87),
-            ),
-          ),
-          
-          const SizedBox(height: 10),
-          
-          // DAY TOGGLES
+          const SizedBox(height: 15),
+          // Day Toggles
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [1, 3, 5].map((day) => Padding(
@@ -66,20 +54,19 @@ class _WindForecastScreenState extends State<WindForecastScreen> {
                 label: Text("$day-Day"),
                 selected: _daysToShow == day,
                 onSelected: (selected) {
-                if (selected) {
+                 if (selected) {
                   setState(() {
                     _daysToShow = day;
                     _hoverIndex = null;
                   });
                 }
-              },
+                },
               ),
             )).toList(),
           ),
-
           const SizedBox(height: 15),
 
-          // 2. THE INTERACTIVE GRAPH WITH DAY/NIGHT SHADING
+          // THE GRAPH
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10),
             child: Stack(
@@ -88,14 +75,14 @@ class _WindForecastScreenState extends State<WindForecastScreen> {
                   onPanUpdate: (details) => _handleTouch(details.localPosition, allEntries, context),
                   onTapDown: (details) => _handleTouch(details.localPosition, allEntries, context),
                   child: Container(
-                    height: 300,
+                    height: 350, // Increased height to fit dates at top
                     width: double.infinity,
                     decoration: BoxDecoration(
                       color: Colors.white,
                       border: Border.all(color: Colors.black12),
                     ),
                     child: CustomPaint(
-                      painter: InteractiveWillyPainter(allEntries, _hoverIndex),
+                      painter: WillyStyleInteractivePainter(allEntries, _hoverIndex, dayBoundaries),
                     ),
                   ),
                 ),
@@ -104,16 +91,12 @@ class _WindForecastScreenState extends State<WindForecastScreen> {
               ],
             ),
           ),
-          
           const Spacer(),
-          const Text("Slide to view wind trend", style: TextStyle(color: Colors.grey, fontSize: 12)),
-          const SizedBox(height: 20),
         ],
       ),
     );
   }
 
-  // ... _handleTouch and _buildTooltip remain the same as previous response ...
   void _handleTouch(Offset localPosition, List<dynamic> entries, BuildContext context) {
     double chartWidth = MediaQuery.of(context).size.width - 20;
     double stepX = chartWidth / (entries.length - 1);
@@ -125,21 +108,24 @@ class _WindForecastScreenState extends State<WindForecastScreen> {
     final date = DateTime.parse(entry['dateTime']);
     final knots = (entry['speed'] / 1.852).round();
     return Positioned(
-      top: 10, left: 10,
+      bottom: 20, // Tooltip at bottom to stay clear of dates
+      left: 20,
       child: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(8)),
-        child: Text("${DateFormat('h:mm a').format(date)} | $knots kts ${entry['directionText']}",
-          style: const TextStyle(color: Colors.white, fontSize: 12)),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.8), borderRadius: BorderRadius.circular(20)),
+        child: Text("${DateFormat('h:mm a').format(date)}: $knots kts ${entry['directionText']}",
+            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
       ),
     );
   }
 }
 
-class InteractiveWillyPainter extends CustomPainter {
+class WillyStyleInteractivePainter extends CustomPainter {
   final List<dynamic> entries;
   final int? hoverIndex;
-  InteractiveWillyPainter(this.entries, this.hoverIndex);
+  final List<Map<String, dynamic>> dayBoundaries;
+
+  WillyStyleInteractivePainter(this.entries, this.hoverIndex, this.dayBoundaries);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -147,39 +133,57 @@ class InteractiveWillyPainter extends CustomPainter {
 
     final double stepX = size.width / (entries.length - 1);
     const double maxWind = 40.0;
+    const double graphTopPadding = 40.0; // Space for dates
 
-    // 1. DRAW DAY/NIGHT BACKGROUND COLUMNS
+    // 1. DRAW DAY/NIGHT BACKGROUNDS
     for (int i = 0; i < entries.length - 1; i++) {
       final hour = DateTime.parse(entries[i]['dateTime']).hour;
-      // Night is typically 6 PM (18) to 6 AM (6)
       bool isNight = hour < 6 || hour >= 18;
       
-      final rect = Rect.fromLTWH(i * stepX, 0, stepX, size.height);
-      final paint = Paint()..color = isNight 
-          ? const Color(0xFFE2E8F0) // Light blue-grey for night
-          : Colors.white;            // White for day
-      canvas.drawRect(rect, paint);
+      final rect = Rect.fromLTWH(i * stepX, graphTopPadding, stepX, size.height - graphTopPadding);
+      canvas.drawRect(rect, Paint()..color = isNight ? const Color(0xFFF1F5F9) : Colors.white);
     }
 
-    // 2. DRAW GRAPH LINES & ARROWS
-    final linePath = Path();
+    // 2. DRAW DATE LABELS AT THE TOP
+    for (var boundary in dayBoundaries) {
+      double x = boundary['startIndex'] * stepX;
+      
+      // Draw a subtle vertical line to separate days
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), Paint()..color = Colors.black12);
+
+      TextPainter(
+        text: TextSpan(
+          text: boundary['label'],
+          style: const TextStyle(color: Colors.black87, fontSize: 12, fontWeight: FontWeight.bold),
+        ),
+        textDirection: ui.TextDirection.ltr,
+      )..layout()..paint(canvas, Offset(x + 5, 10));
+    }
+
+    // 3. DRAW WIND LINE & ARROWS
+    final path = Path();
     for (int i = 0; i < entries.length; i++) {
       double wind = (entries[i]['speed'] / 1.852);
       double x = i * stepX;
-      double y = size.height - (wind / maxWind * size.height);
-      if (i == 0) {
-        linePath.moveTo(x, y);
-      } else { linePath.lineTo(x, y);
-      }
-      // Draw colored arrow
-      _drawArrow(canvas, x, y, entries[i]['directionText'], wind);
-    }
-    canvas.drawPath(linePath, Paint()..color = Colors.blue.shade300..strokeWidth = 2..style = PaintingStyle.stroke);
+      // Scale y to stay within the graph area (below the date labels)
+      double y = size.height - (wind / maxWind * (size.height - graphTopPadding));
 
-    // 3. HOVER LINE
+      if (i == 0) { 
+        path.moveTo(x, y);
+      } else { path.lineTo(x, y);
+     }
+
+      if (entries.length < 50 || i % 2 == 0) {
+        _drawArrow(canvas, x, y, entries[i]['directionText'], wind);
+      }
+    }
+    canvas.drawPath(path, Paint()..color = Colors.blue.shade300..strokeWidth = 2..style = PaintingStyle.stroke);
+
+    // 4. HOVER LINE
     if (hoverIndex != null) {
       double hoverX = hoverIndex! * stepX;
-      canvas.drawLine(Offset(hoverX, 0), Offset(hoverX, size.height), Paint()..color = Colors.blue);
+      canvas.drawLine(Offset(hoverX, graphTopPadding), Offset(hoverX, size.height), 
+          Paint()..color = Colors.blue.withValues(alpha: 0.5)..strokeWidth = 1);
     }
   }
 
@@ -187,6 +191,7 @@ class InteractiveWillyPainter extends CustomPainter {
     Color arrowColor = speed < 10 ? Colors.green : (speed < 18 ? Colors.lightBlue : Colors.orange);
     Map<String, double> directions = {'N': 0, 'NE': 45, 'E': 90, 'SE': 135, 'S': 180, 'SW': 225, 'W': 270, 'NW': 315};
     double angle = (directions[dir.toUpperCase().substring(0, math.min(dir.length, 2))] ?? 0) * (math.pi / 180);
+
     canvas.save();
     canvas.translate(x, y);
     canvas.rotate(angle);
@@ -194,5 +199,6 @@ class InteractiveWillyPainter extends CustomPainter {
     canvas.restore();
   }
 
-  @override bool shouldRepaint(CustomPainter oldDelegate) => true;
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) => true;
 }
