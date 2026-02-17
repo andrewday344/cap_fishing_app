@@ -8,8 +8,8 @@ import '../../services/location_service.dart';
 import '../../services/willy_weather_service.dart';
 import 'package:geolocator/geolocator.dart';
 import '../fish_gallery_screen.dart';
-import '../tide_detail_screen.dart';
 import '../wind_forecast_screen.dart'; // <--- ADD THIS IMPORT
+import '../tide_forecast_screen.dart';
 
 
 class DashboardScreen extends StatefulWidget {
@@ -128,17 +128,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                       ),
                       
-                      // TIDE TILE
+                      // TIDE TILE (Now updated to open the new Forecast Screen)
                       GestureDetector(
-                        onTap: () => Navigator.push(
-                          context, 
-                          MaterialPageRoute(builder: (context) => TideDetailScreen(weatherData: data))
-                        ),
+                        onTap: () {
+                          // Ensuring data is loaded before navigating
+                          if (data['forecasts'] != null) {
+                            Navigator.push(
+                              context, 
+                              MaterialPageRoute(
+                                builder: (context) => TideForecastScreen(forecastData: data['forecasts']),
+                              ),
+                            );
+                          }
+                        },
                         child: DataTile(
                           label: "Tide Details", 
                           value: data['forecasts'] != null ? "View Forecast" : "Loading...",
                           icon: Icons.tsunami, 
-                          color: Colors.blueAccent
+                          color: Colors.blueAccent,
                         ),
                       ),
 
