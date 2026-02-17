@@ -47,10 +47,9 @@ class _TideForecastScreenState extends State<TideForecastScreen> {
             children: [1, 3, 5].map((day) => Padding(
               padding: const EdgeInsets.symmetric(horizontal: 6),
               child: ChoiceChip(
-                label: Text("${day}-Day"),
+                label: Text("$day-Day"), // Fixed: Removed unnecessary braces
                 selected: _daysToShow == day,
                 onSelected: (selected) {
-                  // Using your preferred block-style if
                   if (selected) {
                     setState(() {
                       _daysToShow = day;
@@ -101,7 +100,10 @@ class _TideForecastScreenState extends State<TideForecastScreen> {
       left: 20,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(color: Colors.black.withOpacity(0.8), borderRadius: BorderRadius.circular(8)),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.8), 
+          borderRadius: BorderRadius.circular(8),
+        ),
         child: Text("${DateFormat('h:mm a').format(date)} | $height m",
             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
       ),
@@ -123,12 +125,13 @@ class TideGraphPainter extends CustomPainter {
     const double maxH = 4.0; 
     const double topPad = 50.0;
 
-    // Day/Night and Date Labels
     for (var boundary in dayBoundaries) {
       double x = boundary['startIndex'] * stepX;
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), Paint()..color = Colors.black12);
-      TextPainter(text: TextSpan(text: boundary['label'], style: const TextStyle(color: Colors.black87, fontSize: 12, fontWeight: FontWeight.bold)),
-        textDirection: ui.TextDirection.ltr)..layout()..paint(canvas, Offset(x + 8, 15));
+      TextPainter(
+        text: TextSpan(text: boundary['label'], style: const TextStyle(color: Colors.black87, fontSize: 12, fontWeight: FontWeight.bold)),
+        textDirection: ui.TextDirection.ltr
+      )..layout()..paint(canvas, Offset(x + 8, 15));
     }
 
     final path = Path();
@@ -148,7 +151,7 @@ class TideGraphPainter extends CustomPainter {
     fill.lineTo(size.width, size.height);
     fill.close();
 
-    canvas.drawPath(fill, Paint()..color = Colors.blue.withOpacity(0.2));
+    canvas.drawPath(fill, Paint()..color = Colors.blue.withValues(alpha: 0.2));
     canvas.drawPath(path, Paint()..color = Colors.blue.shade700..strokeWidth = 3..style = PaintingStyle.stroke);
 
     if (hoverIndex != null) {
