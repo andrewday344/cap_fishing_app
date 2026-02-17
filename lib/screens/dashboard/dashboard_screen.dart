@@ -10,7 +10,8 @@ import 'package:geolocator/geolocator.dart';
 import '../fish_gallery_screen.dart';
 import '../wind_forecast_screen.dart';
 import '../tide_forecast_screen.dart';
-import '../swell_forecast_screen.dart'; // <--- Added this import
+import '../swell_forecast_screen.dart';
+
 
 class DashboardScreen extends StatefulWidget {
   final bool isInshore;
