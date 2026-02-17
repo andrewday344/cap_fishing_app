@@ -8,9 +8,9 @@ import '../../services/location_service.dart';
 import '../../services/willy_weather_service.dart';
 import 'package:geolocator/geolocator.dart';
 import '../fish_gallery_screen.dart';
-import '../wind_forecast_screen.dart'; // <--- ADD THIS IMPORT
+import '../wind_forecast_screen.dart';
 import '../tide_forecast_screen.dart';
-
+import '../swell_forecast_screen.dart'; // <--- Added this import
 
 class DashboardScreen extends StatefulWidget {
   final bool isInshore;
@@ -36,7 +36,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       future: WillyWeatherService().getMarineWeather(),
       builder: (context, weatherSnapshot) {
         
-        // 1. Initialize data with default values
         Map<String, dynamic> data = {
           'windKnots': 0, 
           'windDir': '--', 
@@ -49,12 +48,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           'forecasts': null,
         };
 
-        // 2. If data is loaded, use it
         if (weatherSnapshot.hasData) {
           data = weatherSnapshot.data!;
         }
 
-        // 3. Extract variables safely
         final dynamic rawWind = data['windKnots'];
         final double windSpeed = (rawWind is num) ? rawWind.toDouble() : double.tryParse(rawWind.toString()) ?? 0.0;
         final String windDir = data['windDir'] ?? "--";
@@ -88,7 +85,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 _SafetyGauge(windSpeed: windSpeed, color: statusColor, verdict: verdict),
                 const SizedBox(height: 20),
 
-                // GPS TRACKER
                 StreamBuilder<Position>(
                   stream: LocationService().getPositionStream(),
                   builder: (context, gpsSnapshot) {
@@ -108,7 +104,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     mainAxisSpacing: 12,
                     childAspectRatio: 1.1,
                     children: [
-                      // WIND TILE (Now Tappable to open Forecast)
+                      // WIND TREND
                       GestureDetector(
                         onTap: () {
                           if (data['forecasts'] != null) {
@@ -123,15 +119,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         child: DataTile(
                           label: "Wind Trend", 
                           value: "${windSpeed.toInt()} kts $windDir", 
-                          icon: Icons.insights, // Changed icon to suggest a graph
+                          icon: Icons.insights, 
                           color: Colors.blue
                         ),
                       ),
                       
-                      // TIDE TILE (Now updated to open the new Forecast Screen)
+                      // TIDE DETAILS
                       GestureDetector(
                         onTap: () {
-                          // Ensuring data is loaded before navigating
                           if (data['forecasts'] != null) {
                             Navigator.push(
                               context, 
@@ -149,12 +144,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                       ),
 
+                      // SEAS & SWELL (Merged for order: Seas before Swell)
+                      GestureDetector(
+                        onTap: () {
+                          if (data['forecasts'] != null) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => SwellForecastScreen(forecastData: data['forecasts']),
+                              ),
+                            );
+                          }
+                        },
+                        child: DataTile(
+                          label: "Seas & Swell", 
+                          value: data['forecasts'] != null ? "View Forecast" : "Loading...", 
+                          icon: Icons.waves, 
+                          color: Colors.indigo
+                        ),
+                      ),
+
                       DataTile(label: "Next Tide", value: data['nextTide'] ?? '--', icon: Icons.timer, color: Colors.teal),
-                      DataTile(label: "Swell", value: "${data['swellHeight']} ${data['swellDir']}", icon: Icons.waves, color: Colors.indigo),
-                      DataTile(label: "Seas", value: data['seas'] ?? '--', icon: Icons.water, color: Colors.blueGrey),
                       DataTile(label: "Temp", value: "${data['temp'] ?? '--'}°C", icon: Icons.thermostat, color: Colors.orange),
 
-                      // FISH GALLERY TILE
+                      // FISH GALLERY
                       GestureDetector(
                         onTap: () => Navigator.push(
                           context, 
@@ -171,7 +184,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ),
 
-                // RECORD CATCH BUTTON
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 16.0),
                   child: ElevatedButton.icon(
@@ -205,8 +217,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 }
 
-// Keep your _SafetyGauge class below...
-
 class _SafetyGauge extends StatelessWidget {
   final double windSpeed;
   final Color color;
@@ -229,6 +239,7 @@ class _SafetyGauge extends StatelessWidget {
         const SizedBox(height: 16),
         CircleAvatar(
           radius: 70,
+          // Fixed: replaced withOpacity with withValues
           backgroundColor: color.withValues(alpha: 0.1), 
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
