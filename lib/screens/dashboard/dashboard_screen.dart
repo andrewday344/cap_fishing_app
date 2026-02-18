@@ -21,6 +21,34 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   Key _refreshKey = UniqueKey();
+  double _currentSpeedKnots = 0.0; // Track boat speed
+
+  @override
+  void initState() {
+    super.initState();
+    _initSpeedometer(); // Start tracking speed on load
+  }
+
+  void _initSpeedometer() async {
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+
+    Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.bestForNavigation,
+        distanceFilter: 1,
+      ),
+    ).listen((Position position) {
+      if (mounted) {
+        setState(() {
+          // Convert m/s to Knots
+          _currentSpeedKnots = position.speed * 1.94384;
+        });
+      }
+    });
+  }
 
   void _handleRefresh() {
     setState(() {
@@ -34,10 +62,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       key: _refreshKey,
       future: WillyWeatherService().getMarineWeather(),
       builder: (context, weatherSnapshot) {
-        
         Map<String, dynamic> data = {
-          'windKnots': 0, 
-          'windDir': '--', 
+          'windKnots': 0,
+          'windDir': '--',
           'temp': '--',
           'warning': 'NIL',
           'forecasts': null,
@@ -50,7 +77,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final dynamic rawWind = data['windKnots'];
         final double windSpeedNum = (rawWind is num) ? rawWind.toDouble() : double.tryParse(rawWind.toString()) ?? 0.0;
         final String windDir = data['windDir'] ?? "--";
-        
+
         final verdict = SafetyEngine.getVerdict(widget.isInshore, windSpeedNum);
         final statusColor = SafetyEngine.getStatusColor(verdict);
 
@@ -76,36 +103,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 if (weatherSnapshot.connectionState == ConnectionState.waiting)
                   const LinearProgressIndicator(minHeight: 2),
-                
-                // 1. Safety Verdict Message
+
                 Text(
-                  verdict == SafetyVerdict.go ? "GOOD TO LAUNCH" : 
-                  (verdict == SafetyVerdict.caution ? "PROCEED WITH CAUTION" : "STAY INSHORE"),
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: statusColor)
+                  verdict == SafetyVerdict.go ? "GOOD TO LAUNCH" : (verdict == SafetyVerdict.caution ? "PROCEED WITH CAUTION" : "STAY INSHORE"),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: statusColor),
                 ),
-                
+
                 const SizedBox(height: 10),
 
-                // 2. The Bridge Widget (framing Wind, Temp, Warnings)
                 StreamBuilder<Position>(
                   stream: LocationService().getPositionStream(),
                   builder: (context, gpsSnapshot) {
-                    final distance = gpsSnapshot.hasData 
-                      ? LocationService().getDistanceToRamp(gpsSnapshot.data!.latitude, gpsSnapshot.data!.longitude)
-                      : 0.0;
-                    
+                    final distance = gpsSnapshot.hasData ? LocationService().getDistanceToRamp(gpsSnapshot.data!.latitude, gpsSnapshot.data!.longitude) : 0.0;
+
                     return SafetyMapCard(
                       distanceInMeters: distance,
                       temp: data['temp']?.toString() ?? "--",
                       windSpeed: windSpeedNum.toInt().toString(),
                       warning: data['warning'],
+                      boatSpeed: _currentSpeedKnots.toStringAsFixed(1), // Added Boat Speed
                     );
                   },
                 ),
 
                 const SizedBox(height: 20),
-                
-                // 3. Navigation Grid
+
                 Expanded(
                   child: GridView.count(
                     crossAxisCount: 2,
@@ -113,15 +135,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     mainAxisSpacing: 12,
                     childAspectRatio: 1.2,
                     children: [
-                      _navTile(context, "Wind Trend", "${windSpeedNum.toInt()} kts $windDir", Icons.insights, Colors.blue, 
-                        () => _push(context, WindForecastScreen(forecastData: data['forecasts']), data['forecasts'])),
-                      
-                      _navTile(context, "Tide Details", "View Forecast", Icons.tsunami, Colors.blueAccent, 
-                        () => _push(context, TideForecastScreen(forecastData: data['forecasts']), data['forecasts'])),
-
-                      _navTile(context, "Seas & Swell", "View Forecast", Icons.waves, Colors.indigo, 
-                        () => _push(context, SwellForecastScreen(forecastData: data['forecasts']), data['forecasts'])),
-
+                      _navTile(context, "Wind Trend", "${windSpeedNum.toInt()} kts $windDir", Icons.insights, Colors.blue, () => _push(context, WindForecastScreen(forecastData: data['forecasts']), data['forecasts'])),
+                      _navTile(context, "Tide Details", "View Forecast", Icons.tsunami, Colors.blueAccent, () => _push(context, TideForecastScreen(forecastData: data['forecasts']), data['forecasts'])),
+                      _navTile(context, "Seas & Swell", "View Forecast", Icons.waves, Colors.indigo, () => _push(context, SwellForecastScreen(forecastData: data['forecasts']), data['forecasts'])),
                       DataTile(label: "Next Tide", value: data['nextTide'] ?? '--', icon: Icons.timer, color: Colors.teal),
                     ],
                   ),
@@ -141,7 +157,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
                 ),
-                
+
                 Text(
                   "Last Updated: ${data['lastUpdated'] ?? '--'}",
                   style: TextStyle(color: Colors.grey.shade500, fontSize: 12, fontStyle: FontStyle.italic),

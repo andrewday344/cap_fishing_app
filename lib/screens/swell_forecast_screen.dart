@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:geolocator/geolocator.dart';
 import 'dart:ui' as ui;
 
 class SwellForecastScreen extends StatefulWidget {
@@ -14,35 +13,13 @@ class SwellForecastScreen extends StatefulWidget {
 class _SwellForecastScreenState extends State<SwellForecastScreen> {
   int _daysToShow = 1;
   int? _hoverIndex;
-  double _currentSpeedKnots = 0.0;
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _initSpeedometer();
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) setState(() => _isLoading = false);
-    });
-  }
-
-  void _initSpeedometer() async {
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
-
-    Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.bestForNavigation,
-        distanceFilter: 1, 
-      ),
-    ).listen((Position position) {
-      if (mounted) {
-        setState(() {
-          _currentSpeedKnots = position.speed * 1.94384;
-        });
-      }
     });
   }
 
@@ -69,105 +46,57 @@ class _SwellForecastScreenState extends State<SwellForecastScreen> {
       debugPrint("Swell Data Error: $e");
     }
 
-    String temp = widget.forecastData['temp']?.toString() ?? "22";
-    String? warning = widget.forecastData['warning'];
-
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
-      body: _isLoading 
-        ? const Center(child: CircularProgressIndicator())
-        : Column(
-            children: [
-              _buildBridgeHeader(temp, warning),
-              const SizedBox(height: 10),
-              _buildDaySelector(),
-              const SizedBox(height: 10),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  child: Stack(
-                    children: [
-                      GestureDetector(
-                        onPanUpdate: (details) => allEntries.isNotEmpty ? _handleTouch(details.localPosition, allEntries) : null,
-                        onTapDown: (details) => allEntries.isNotEmpty ? _handleTouch(details.localPosition, allEntries) : null,
-                        child: Container(
-                          height: double.infinity,
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            color: Colors.white, 
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.black12)
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: CustomPaint(
-                              painter: SwellGraphPainter(allEntries, _hoverIndex, dayBoundaries),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 1,
+        // Step 3 Fix: Teal arrow to go back
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.teal),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          "Seacliff Sea & Swell",
+          style: TextStyle(color: Colors.black87, fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              children: [
+                const SizedBox(height: 15),
+                _buildDaySelector(),
+                const SizedBox(height: 15),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Stack(
+                      children: [
+                        GestureDetector(
+                          onPanUpdate: (details) => allEntries.isNotEmpty ? _handleTouch(details.localPosition, allEntries) : null,
+                          onTapDown: (details) => allEntries.isNotEmpty ? _handleTouch(details.localPosition, allEntries) : null,
+                          child: Container(
+                            height: double.infinity,
+                            width: double.infinity,
+                            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.black12)),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: CustomPaint(
+                                painter: SwellGraphPainter(allEntries, _hoverIndex, dayBoundaries),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      if (_hoverIndex != null && _hoverIndex! < allEntries.length)
-                        _buildSwellTooltip(allEntries[_hoverIndex!]),
-                      
-                      if (allEntries.isEmpty)
-                        const Center(child: Text("Waiting for swell data...", style: TextStyle(color: Colors.grey))),
-                    ],
+                        if (_hoverIndex != null && _hoverIndex! < allEntries.length) _buildSwellTooltip(allEntries[_hoverIndex!]),
+                        if (allEntries.isEmpty) const Center(child: Text("Waiting for swell data...", style: TextStyle(color: Colors.grey))),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
-            ],
-          ),
-    );
-  }
-
-  Widget _buildBridgeHeader(String temp, String? warning) {
-    bool hasWarning = warning != null && warning.toLowerCase() != "nil" && warning.isNotEmpty;
-    
-    return Container(
-      padding: const EdgeInsets.only(top: 60, left: 20, right: 20, bottom: 20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.thermostat, size: 20, color: Colors.orange),
-                  Text("$temp°C", style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: hasWarning ? Colors.red.shade600 : Colors.green.shade500,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  hasWarning ? "⚠️ $warning" : "✓ NO WARNINGS",
-                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              const Text("BOAT SPEED", style: TextStyle(fontSize: 10, color: Colors.black45, fontWeight: FontWeight.bold)),
-              Text(
-                "${_currentSpeedKnots.toStringAsFixed(1)} kts",
-                style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Color(0xFF1E293B)),
-              ),
-            ],
-          ),
-        ],
-      ),
+                const SizedBox(height: 20),
+              ],
+            ),
     );
   }
 
@@ -175,20 +104,20 @@ class _SwellForecastScreenState extends State<SwellForecastScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [1, 3, 5].map((day) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: ChoiceChip(
-          label: Text("$day-Day"), 
-          selected: _daysToShow == day,
-          onSelected: (selected) {
-            if (selected) {
-              setState(() {
-                _daysToShow = day;
-                _hoverIndex = null;
-              });
-            }
-          },
-        ),
-      )).toList(),
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: ChoiceChip(
+              label: Text("$day-Day"),
+              selected: _daysToShow == day,
+              onSelected: (selected) {
+                if (selected) {
+                  setState(() {
+                    _daysToShow = day;
+                    _hoverIndex = null;
+                  });
+                }
+              },
+            ),
+          )).toList(),
     );
   }
 
@@ -205,9 +134,9 @@ class _SwellForecastScreenState extends State<SwellForecastScreen> {
     final double sea = (entry['seaHeight'] ?? 0.0).toDouble();
     final double swell = (entry['swellHeight'] ?? 0.0).toDouble();
     final int period = entry['swellPeriod'] ?? 0;
-    
+
     return Positioned(
-      top: 80,
+      top: 20,
       left: 20,
       right: 20,
       child: Container(
@@ -252,7 +181,7 @@ class SwellGraphPainter extends CustomPainter {
     if (entries.isEmpty) return;
 
     final double stepX = size.width / (entries.length > 1 ? entries.length - 1 : 1);
-    const double maxWaveHeight = 4.0; 
+    const double maxWaveHeight = 4.0;
     const double topPad = 60.0;
 
     double getY(dynamic h) {
@@ -263,7 +192,7 @@ class SwellGraphPainter extends CustomPainter {
     for (var boundary in dayBoundaries) {
       double x = boundary['startIndex'] * stepX;
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), Paint()..color = Colors.black.withValues(alpha: 0.05));
-      
+
       TextPainter(
         text: TextSpan(text: boundary['label'], style: TextStyle(color: Colors.blueGrey.shade300, fontSize: 10, fontWeight: FontWeight.bold)),
         textDirection: ui.TextDirection.ltr,

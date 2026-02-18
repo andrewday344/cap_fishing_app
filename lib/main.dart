@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-// Use the package: path instead of the relative path to be safe
+// Replace 'c_a_p' with your actual package name from pubspec.yaml if different
 import 'package:c_a_p/screens/dashboard/dashboard_screen.dart'; 
 
 void main() async {
@@ -16,14 +16,8 @@ class SeacliffApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false, // Cleaner look for your dashboard
-      title: 'Seacliff Fishing',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-        useMaterial3: true,
-      ),
-      // Ensure the name here matches exactly: DashboardScreen
-      home: const DashboardScreen(isInshore: true), 
+      debugShowCheckedModeBanner: false,
+      home: const DashboardScreen(isInshore: true), // This will now recognize the class [cite: 973]
     );
   }
 }

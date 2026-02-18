@@ -28,6 +28,7 @@ class WillyWeatherService {
           'swellDir': _extractSwellDir(forecasts),
           'nextTide': _getNextTide(forecasts),
           'forecasts': forecasts,
+          'warning': forecasts?['warnings']?[0]?['title'] ?? 'NIL', // Extracting first warning if any
           'lastUpdated': DateFormat('h:mm a').format(DateTime.now()),
         };
       } else {
