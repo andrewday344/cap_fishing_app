@@ -7,11 +7,9 @@ import '../../widgets/safety_map_card.dart';
 import '../../services/location_service.dart';
 import '../../services/willy_weather_service.dart';
 import 'package:geolocator/geolocator.dart';
-import '../fish_gallery_screen.dart';
 import '../wind_forecast_screen.dart';
 import '../tide_forecast_screen.dart';
 import '../swell_forecast_screen.dart';
-
 
 class DashboardScreen extends StatefulWidget {
   final bool isInshore;
@@ -40,12 +38,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         Map<String, dynamic> data = {
           'windKnots': 0, 
           'windDir': '--', 
-          'currentTide': '--',
-          'nextTide': '--', 
-          'swellHeight': '--', 
-          'swellDir': '', 
-          'seas': '--', 
           'temp': '--',
+          'warning': 'NIL',
           'forecasts': null,
         };
 
@@ -54,10 +48,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         }
 
         final dynamic rawWind = data['windKnots'];
-        final double windSpeed = (rawWind is num) ? rawWind.toDouble() : double.tryParse(rawWind.toString()) ?? 0.0;
+        final double windSpeedNum = (rawWind is num) ? rawWind.toDouble() : double.tryParse(rawWind.toString()) ?? 0.0;
         final String windDir = data['windDir'] ?? "--";
         
-        final verdict = SafetyEngine.getVerdict(widget.isInshore, windSpeed);
+        final verdict = SafetyEngine.getVerdict(widget.isInshore, windSpeedNum);
         final statusColor = SafetyEngine.getStatusColor(verdict);
 
         return Scaffold(
@@ -83,104 +77,52 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 if (weatherSnapshot.connectionState == ConnectionState.waiting)
                   const LinearProgressIndicator(minHeight: 2),
                 
-                _SafetyGauge(windSpeed: windSpeed, color: statusColor, verdict: verdict),
-                const SizedBox(height: 20),
+                // 1. Safety Verdict Message
+                Text(
+                  verdict == SafetyVerdict.go ? "GOOD TO LAUNCH" : 
+                  (verdict == SafetyVerdict.caution ? "PROCEED WITH CAUTION" : "STAY INSHORE"),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: statusColor)
+                ),
+                
+                const SizedBox(height: 10),
 
+                // 2. The Bridge Widget (framing Wind, Temp, Warnings)
                 StreamBuilder<Position>(
                   stream: LocationService().getPositionStream(),
                   builder: (context, gpsSnapshot) {
                     final distance = gpsSnapshot.hasData 
                       ? LocationService().getDistanceToRamp(gpsSnapshot.data!.latitude, gpsSnapshot.data!.longitude)
                       : 0.0;
-                    return SafetyMapCard(distanceInMeters: distance);
+                    
+                    return SafetyMapCard(
+                      distanceInMeters: distance,
+                      temp: data['temp']?.toString() ?? "--",
+                      windSpeed: windSpeedNum.toInt().toString(),
+                      warning: data['warning'],
+                    );
                   },
                 ),
 
                 const SizedBox(height: 20),
                 
+                // 3. Navigation Grid
                 Expanded(
                   child: GridView.count(
                     crossAxisCount: 2,
                     crossAxisSpacing: 12,
                     mainAxisSpacing: 12,
-                    childAspectRatio: 1.1,
+                    childAspectRatio: 1.2,
                     children: [
-                      // WIND TREND
-                      GestureDetector(
-                        onTap: () {
-                          if (data['forecasts'] != null) {
-                            Navigator.push(
-                              context, 
-                              MaterialPageRoute(
-                                builder: (context) => WindForecastScreen(forecastData: data['forecasts'])
-                              )
-                            );
-                          }
-                        },
-                        child: DataTile(
-                          label: "Wind Trend", 
-                          value: "${windSpeed.toInt()} kts $windDir", 
-                          icon: Icons.insights, 
-                          color: Colors.blue
-                        ),
-                      ),
+                      _navTile(context, "Wind Trend", "${windSpeedNum.toInt()} kts $windDir", Icons.insights, Colors.blue, 
+                        () => _push(context, WindForecastScreen(forecastData: data['forecasts']), data['forecasts'])),
                       
-                      // TIDE DETAILS
-                      GestureDetector(
-                        onTap: () {
-                          if (data['forecasts'] != null) {
-                            Navigator.push(
-                              context, 
-                              MaterialPageRoute(
-                                builder: (context) => TideForecastScreen(forecastData: data['forecasts']),
-                              ),
-                            );
-                          }
-                        },
-                        child: DataTile(
-                          label: "Tide Details", 
-                          value: data['forecasts'] != null ? "View Forecast" : "Loading...",
-                          icon: Icons.tsunami, 
-                          color: Colors.blueAccent,
-                        ),
-                      ),
+                      _navTile(context, "Tide Details", "View Forecast", Icons.tsunami, Colors.blueAccent, 
+                        () => _push(context, TideForecastScreen(forecastData: data['forecasts']), data['forecasts'])),
 
-                      // SEAS & SWELL (Merged for order: Seas before Swell)
-                      GestureDetector(
-                        onTap: () {
-                          if (data['forecasts'] != null) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => SwellForecastScreen(forecastData: data['forecasts']),
-                              ),
-                            );
-                          }
-                        },
-                        child: DataTile(
-                          label: "Seas & Swell", 
-                          value: data['forecasts'] != null ? "View Forecast" : "Loading...", 
-                          icon: Icons.waves, 
-                          color: Colors.indigo
-                        ),
-                      ),
+                      _navTile(context, "Seas & Swell", "View Forecast", Icons.waves, Colors.indigo, 
+                        () => _push(context, SwellForecastScreen(forecastData: data['forecasts']), data['forecasts'])),
 
                       DataTile(label: "Next Tide", value: data['nextTide'] ?? '--', icon: Icons.timer, color: Colors.teal),
-                      DataTile(label: "Temp", value: "${data['temp'] ?? '--'}°C", icon: Icons.thermostat, color: Colors.orange),
-
-                      // FISH GALLERY
-                      GestureDetector(
-                        onTap: () => Navigator.push(
-                          context, 
-                          MaterialPageRoute(builder: (context) => const FishGalleryScreen())
-                        ),
-                        child: const DataTile(
-                          label: "Fish Gallery", 
-                          value: "Limits & Sizes", 
-                          icon: Icons.set_meal, 
-                          color: Colors.green
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -188,13 +130,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 16.0),
                   child: ElevatedButton.icon(
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const CatchLogScreen()),
-                    ),
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CatchLogScreen())),
                     icon: const Icon(Icons.add_circle_outline),
-                    label: const Text("RECORD PRIVATE CATCH", 
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    label: const Text("RECORD PRIVATE CATCH", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     style: ElevatedButton.styleFrom(
                       minimumSize: const Size(double.infinity, 60),
                       backgroundColor: const Color(0xFF004E92),
@@ -208,7 +146,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   "Last Updated: ${data['lastUpdated'] ?? '--'}",
                   style: TextStyle(color: Colors.grey.shade500, fontSize: 12, fontStyle: FontStyle.italic),
                 ),
-                const SizedBox(height: 20),
               ],
             ),
           ),
@@ -216,42 +153,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       },
     );
   }
-}
 
-class _SafetyGauge extends StatelessWidget {
-  final double windSpeed;
-  final Color color;
-  final SafetyVerdict verdict;
+  void _push(BuildContext context, Widget screen, dynamic check) {
+    if (check != null) Navigator.push(context, MaterialPageRoute(builder: (context) => screen));
+  }
 
-  const _SafetyGauge({required this.windSpeed, required this.color, required this.verdict});
-
-  @override
-  Widget build(BuildContext context) {
-    String message = "STAY INSHORE";
-    if (verdict == SafetyVerdict.go) message = "GOOD TO LAUNCH";
-    if (verdict == SafetyVerdict.caution) message = "PROCEED WITH CAUTION";
-
-    return Column(
-      children: [
-        Text(
-          message,
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)
-        ),
-        const SizedBox(height: 16),
-        CircleAvatar(
-          radius: 70,
-          // Fixed: replaced withOpacity with withValues
-          backgroundColor: color.withValues(alpha: 0.1), 
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text("${windSpeed.toInt()}", 
-                style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: color)),
-              Text("KNOTS", style: TextStyle(fontSize: 14, color: color)),
-            ],
-          ),
-        ),
-      ],
-    );
+  Widget _navTile(BuildContext context, String label, String val, IconData icon, Color color, VoidCallback tap) {
+    return GestureDetector(onTap: tap, child: DataTile(label: label, value: val, icon: icon, color: color));
   }
 }
