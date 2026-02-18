@@ -5,6 +5,7 @@ class SafetyMapCard extends StatelessWidget {
   final String temp;
   final String? warning;
   final String windSpeed;
+  final String boatSpeed; // Added boat speed parameter
 
   const SafetyMapCard({
     super.key, 
@@ -12,6 +13,7 @@ class SafetyMapCard extends StatelessWidget {
     required this.temp,
     this.warning,
     required this.windSpeed,
+    required this.boatSpeed,
   });
 
   @override
@@ -22,39 +24,37 @@ class SafetyMapCard extends StatelessWidget {
 
     return Column(
       children: [
-        // 1. BRIDGE STATS ROW (Temp | Wind | Warning)
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20),
+          padding: const EdgeInsets.symmetric(vertical: 10),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              // TEMPERATURE
               _buildBridgeStat("TEMP", "$temp°C", Icons.thermostat, Colors.orange),
               
-              // CENTRAL WIND SPEED
+              // Central Wind Speed
               Column(
                 children: [
-                  Text(
-                    windSpeed,
-                    style: const TextStyle(fontSize: 58, fontWeight: FontWeight.w900, height: 1.0),
-                  ),
-                  const Text("WIND KNOTS", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+                  Text(windSpeed, style: const TextStyle(fontSize: 54, fontWeight: FontWeight.w900, height: 1.0)),
+                  const Text("WIND KNOTS", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
                 ],
               ),
 
-              // WARNINGS
-              _buildBridgeStat(
-                "STATUS", 
-                hasWarning ? "WARNING" : "CLEAR", 
-                hasWarning ? Icons.warning_amber_rounded : Icons.check_circle_outline, 
-                hasWarning ? Colors.red : Colors.green,
-                subText: hasWarning ? warning : "NIL",
-              ),
+              // Boat Speed (Speedometer moved here)
+              _buildBridgeStat("SPEED", "$boatSpeed kts", Icons.speed, Colors.blueAccent),
             ],
           ),
         ),
+        
+        // Status/Warning Bar
+        if (hasWarning) 
+          Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
+            child: Text("⚠️ $warning", style: const TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold)),
+          ),
 
-        // 2. DISTANCE CARD (Your original logic)
+        // Distance Card
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -64,29 +64,15 @@ class SafetyMapCard extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Icon(
-                isTooFar ? Icons.warning_amber_rounded : Icons.sailing,
-                color: isTooFar ? Colors.red : Colors.blue,
-                size: 40,
-              ),
+              Icon(isTooFar ? Icons.warning_amber_rounded : Icons.sailing, color: isTooFar ? Colors.red : Colors.blue, size: 32),
               const SizedBox(width: 15),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text("Distance to Seacliff Ramp", 
-                      style: TextStyle(fontSize: 12, color: Colors.grey)),
-                    Text("${kms.toStringAsFixed(2)} km", 
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    const Text("Distance to Seacliff Ramp", style: TextStyle(fontSize: 11, color: Colors.grey)),
+                    Text("${kms.toStringAsFixed(2)} km", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   ],
-                ),
-              ),
-              Text(
-                isTooFar ? "OUTSIDE RANGE" : "SAFE RANGE",
-                style: TextStyle(
-                  color: isTooFar ? Colors.red : Colors.green,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 10,
                 ),
               ),
             ],
@@ -96,13 +82,12 @@ class SafetyMapCard extends StatelessWidget {
     );
   }
 
-  Widget _buildBridgeStat(String label, String value, IconData icon, Color color, {String? subText}) {
+  Widget _buildBridgeStat(String label, String value, IconData icon, Color color) {
     return Column(
       children: [
-        Icon(icon, size: 20, color: color),
-        const SizedBox(height: 4),
-        Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        Text(subText ?? label, style: const TextStyle(fontSize: 9, color: Colors.black45, fontWeight: FontWeight.bold)),
+        Icon(icon, size: 18, color: color),
+        Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        Text(label, style: const TextStyle(fontSize: 8, color: Colors.black45, fontWeight: FontWeight.bold)),
       ],
     );
   }
