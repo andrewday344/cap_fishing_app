@@ -10,6 +10,7 @@ import 'package:geolocator/geolocator.dart';
 import '../wind_forecast_screen.dart';
 import '../tide_forecast_screen.dart';
 import '../swell_forecast_screen.dart';
+import '../fish_gallery_screen.dart'; // REINSTATED IMPORT
 
 class DashboardScreen extends StatefulWidget {
   final bool isInshore;
@@ -20,13 +21,15 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  Key _refreshKey = UniqueKey();
-  double _currentSpeedKnots = 0.0; // Track boat speed
+  double _currentSpeedKnots = 0.0;
+  // FIX: Store the weather future here to prevent flickering
+  late Future<Map<String, dynamic>> _weatherFuture;
 
   @override
   void initState() {
     super.initState();
-    _initSpeedometer(); // Start tracking speed on load
+    _weatherFuture = WillyWeatherService().getMarineWeather(); // Load once
+    _initSpeedometer();
   }
 
   void _initSpeedometer() async {
@@ -43,7 +46,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     ).listen((Position position) {
       if (mounted) {
         setState(() {
-          // Convert m/s to Knots
           _currentSpeedKnots = position.speed * 1.94384;
         });
       }
@@ -52,15 +54,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _handleRefresh() {
     setState(() {
-      _refreshKey = UniqueKey();
+      // Re-run the fetch only when manually requested
+      _weatherFuture = WillyWeatherService().getMarineWeather();
     });
   }
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<Map<String, dynamic>>(
-      key: _refreshKey,
-      future: WillyWeatherService().getMarineWeather(),
+      future: _weatherFuture, // FIX: Use the stored variable, not a new function call
       builder: (context, weatherSnapshot) {
         Map<String, dynamic> data = {
           'windKnots': 0,
@@ -121,7 +123,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       temp: data['temp']?.toString() ?? "--",
                       windSpeed: windSpeedNum.toInt().toString(),
                       warning: data['warning'],
-                      boatSpeed: _currentSpeedKnots.toStringAsFixed(1), // Added Boat Speed
+                      boatSpeed: _currentSpeedKnots.toStringAsFixed(1),
                     );
                   },
                 ),
@@ -138,6 +140,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       _navTile(context, "Wind Trend", "${windSpeedNum.toInt()} kts $windDir", Icons.insights, Colors.blue, () => _push(context, WindForecastScreen(forecastData: data['forecasts']), data['forecasts'])),
                       _navTile(context, "Tide Details", "View Forecast", Icons.tsunami, Colors.blueAccent, () => _push(context, TideForecastScreen(forecastData: data['forecasts']), data['forecasts'])),
                       _navTile(context, "Seas & Swell", "View Forecast", Icons.waves, Colors.indigo, () => _push(context, SwellForecastScreen(forecastData: data['forecasts']), data['forecasts'])),
+                      
+                      // REINSTATED: Fish Gallery Tile
+                      _navTile(context, "Fish Gallery", "Species Info", Icons.set_meal, Colors.orange, () => Navigator.push(context, MaterialPageRoute(builder: (context) => const FishGalleryScreen()))),
+                      
                       DataTile(label: "Next Tide", value: data['nextTide'] ?? '--', icon: Icons.timer, color: Colors.teal),
                     ],
                   ),
