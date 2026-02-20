@@ -170,67 +170,103 @@ class _SwellForecastScreenState extends State<SwellForecastScreen> {
 }
 
 class SwellGraphPainter extends CustomPainter {
-  final List<dynamic> entries;
-  final int? hoverIndex;
-  final List<Map<String, dynamic>> dayBoundaries;
+final List<dynamic> entries;
+final int? hoverIndex;
+final List<Map<String, dynamic>> dayBoundaries;
 
-  SwellGraphPainter(this.entries, this.hoverIndex, this.dayBoundaries);
+SwellGraphPainter(this.entries, this.hoverIndex, this.dayBoundaries);
 
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (entries.isEmpty) return;
+@override
+void paint(Canvas canvas, Size size) {
+if (entries.length < 2) return;
 
-    final double stepX = size.width / (entries.length > 1 ? entries.length - 1 : 1);
-    const double maxWaveHeight = 4.0;
-    const double topPad = 60.0;
+final double stepX = size.width / (entries.length - 1);
+const double maxWaveHeight = 4.0; 
+const double topPad = 60.0;
+const double arrowY = 340.0; // Position for arrows near the bottom
 
-    double getY(dynamic h) {
-      double height = (h ?? 0.0).toDouble();
-      return size.height - (height / maxWaveHeight * (size.height - topPad)).clamp(0, size.height);
-    }
+double getY(dynamic h) {
+  final double val = (h is num) ? h.toDouble() : 0.0;
+  return size.height - (val / maxWaveHeight * (size.height - topPad));
+}
 
-    for (var boundary in dayBoundaries) {
-      double x = boundary['startIndex'] * stepX;
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), Paint()..color = Colors.black.withValues(alpha: 0.05));
+// 1. Day Boundaries & Date Labels
+for (var boundary in dayBoundaries) {
+  double x = boundary['startIndex'] * stepX;
+  canvas.drawLine(Offset(x, 0), Offset(x, size.height), Paint()..color = Colors.black12);
+  TextPainter(
+    text: TextSpan(
+      text: boundary['label'], 
+      style: const TextStyle(color: Colors.black54, fontSize: 11, fontWeight: FontWeight.bold)
+    ),
+    textDirection: ui.TextDirection.ltr,
+  )..layout()..paint(canvas, Offset(x + 8, 20));
+}
 
-      TextPainter(
-        text: TextSpan(text: boundary['label'], style: TextStyle(color: Colors.blueGrey.shade300, fontSize: 10, fontWeight: FontWeight.bold)),
-        textDirection: ui.TextDirection.ltr,
-      )..layout()..paint(canvas, Offset(x + 8, 20));
-    }
+// 2. Wave Paths
+final seaPath = Path();
+final swellPath = Path();
+seaPath.moveTo(0, getY(entries[0]['seaHeight']));
+swellPath.moveTo(0, getY(entries[0]['swellHeight']));
 
-    if (entries.length >= 2) {
-      final seaPath = Path();
-      seaPath.moveTo(0, getY(entries[0]['seaHeight']));
-      for (int i = 0; i < entries.length - 1; i++) {
-        double x1 = i * stepX, x2 = (i + 1) * stepX;
-        double y1 = getY(entries[i]['seaHeight']), y2 = getY(entries[i + 1]['seaHeight']);
-        seaPath.cubicTo((x1 + x2) / 2, y1, (x1 + x2) / 2, y2, x2, y2);
-      }
-      canvas.drawPath(seaPath, Paint()..color = Colors.cyan.withValues(alpha: 0.4)..strokeWidth = 2..style = PaintingStyle.stroke);
-
-      final swellPath = Path();
-      swellPath.moveTo(0, getY(entries[0]['swellHeight']));
-      for (int i = 0; i < entries.length - 1; i++) {
-        double x1 = i * stepX, x2 = (i + 1) * stepX;
-        double y1 = getY(entries[i]['swellHeight']), y2 = getY(entries[i + 1]['swellHeight']);
-        swellPath.cubicTo((x1 + x2) / 2, y1, (x1 + x2) / 2, y2, x2, y2);
-      }
-      canvas.drawPath(swellPath, Paint()..color = const Color(0xFF0F172A)..strokeWidth = 3..style = PaintingStyle.stroke);
-    }
-
-    if (hoverIndex != null && hoverIndex! < entries.length) {
-      double hX = hoverIndex! * stepX;
-      double seaY = getY(entries[hoverIndex!]['seaHeight']);
-      double swellY = getY(entries[hoverIndex!]['swellHeight']);
-
-      canvas.drawLine(Offset(hX, 0), Offset(hX, size.height), Paint()..color = Colors.blue.withValues(alpha: 0.2)..strokeWidth = 1);
-      canvas.drawCircle(Offset(hX, seaY), 4, Paint()..color = Colors.cyan);
-      canvas.drawCircle(Offset(hX, swellY), 6, Paint()..color = const Color(0xFF0F172A));
-      canvas.drawCircle(Offset(hX, swellY), 3, Paint()..color = Colors.white);
-    }
+for (int i = 0; i < entries.length - 1; i++) {
+  double x1 = i * stepX;
+  double x2 = (i + 1) * stepX;
+  seaPath.cubicTo((x1 + x2) / 2, getY(entries[i]['seaHeight']), (x1 + x2) / 2, getY(entries[i+1]['seaHeight']), x2, getY(entries[i+1]['seaHeight']));
+  swellPath.cubicTo((x1 + x2) / 2, getY(entries[i]['swellHeight']), (x1 + x2) / 2, getY(entries[i+1]['swellHeight']), x2, getY(entries[i+1]['swellHeight']));
+  
+  // 3. DRAW DIRECTION ARROWS (Every 3rd entry to keep it clean)
+  if (i % 3 == 0) {
+    _drawArrow(canvas, Offset(x1, arrowY), entries[i]['swellDir'] ?? '');
   }
+}
 
-  @override
-  bool shouldRepaint(CustomPainter oldDelegate) => true;
+canvas.drawPath(seaPath, Paint()..color = Colors.cyan.shade300..strokeWidth = 2..style = PaintingStyle.stroke);
+canvas.drawPath(swellPath, Paint()..color = Colors.blue.shade900..strokeWidth = 3..style = PaintingStyle.stroke);
+
+// 4. Hover Marker
+if (hoverIndex != null && hoverIndex! < entries.length) {
+  double hX = hoverIndex! * stepX;
+  canvas.drawLine(Offset(hX, topPad), Offset(hX, size.height), Paint()..color = Colors.black26);
+  canvas.drawCircle(Offset(hX, getY(entries[hoverIndex!]['seaHeight'])), 4, Paint()..color = Colors.cyan);
+  canvas.drawCircle(Offset(hX, getY(entries[hoverIndex!]['swellHeight'])), 5, Paint()..color = Colors.blue.shade900);
+}
+}
+
+void _drawArrow(Canvas canvas, Offset position, String dir) {
+if (dir.isEmpty) return;
+
+final double angle = _getAngle(dir);
+canvas.save();
+canvas.translate(position.dx, position.dy);
+canvas.rotate(angle);
+
+final arrowPaint = Paint()
+  ..color = Colors.blueGrey.withValues(alpha: 0.6)
+  ..style = PaintingStyle.stroke
+  ..strokeWidth = 1.5;
+
+final path = Path()
+  ..moveTo(0, 6)
+  ..lineTo(0, -6)
+  ..moveTo(-3, -2)
+  ..lineTo(0, -6)
+  ..lineTo(3, -2);
+
+canvas.drawPath(path, arrowPaint);
+canvas.restore();
+}
+
+double _getAngle(String dir) {
+Map<String, double> angles = {
+'N': 0, 'NNE': 0.39, 'NE': 0.78, 'ENE': 1.17,
+'E': 1.57, 'ESE': 1.96, 'SE': 2.35, 'SSE': 2.74,
+'S': 3.14, 'SSW': 3.53, 'SW': 3.92, 'WSW': 4.31,
+'W': 4.71, 'WNW': 5.10, 'NW': 5.49, 'NNW': 5.89,
+};
+return angles[dir.toUpperCase()] ?? 0;
+}
+
+@override
+bool shouldRepaint(CustomPainter oldDelegate) => true;
 }
