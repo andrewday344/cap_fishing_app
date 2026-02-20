@@ -34,13 +34,13 @@ try {
     }
   }
 } catch (e) {
-  return const Scaffold(body: Center(child: Text("Swell data loading error...")));
+  return const Scaffold(body: Center(child: Text("Swell data loading...")));
 }
 
 if (allEntries.isEmpty) {
   return Scaffold(
     appBar: AppBar(title: const Text("Seacliff Sea & Swell")),
-    body: const Center(child: Text("No Swell data found. check API call.")),
+    body: const Center(child: Text("No Swell data found.")),
   );
 }
 
@@ -81,7 +81,7 @@ return Scaffold(
               onPanUpdate: (details) => _handleTouch(details.localPosition, allEntries),
               onTapDown: (details) => _handleTouch(details.localPosition, allEntries),
               child: Container(
-                height: 400,
+                height: 420,
                 width: double.infinity,
                 decoration: BoxDecoration(
                   color: Colors.white, 
@@ -115,7 +115,6 @@ Widget _buildSwellTooltip(dynamic entry) {
 final date = DateTime.parse(entry['dateTime']);
 final height = (entry['height'] ?? 0.0).toStringAsFixed(1);
 final period = entry['period'] ?? '--';
-final dir = entry['directionText'] ?? '--';
 
 return Positioned(
   top: 60,
@@ -127,7 +126,7 @@ return Positioned(
       borderRadius: BorderRadius.circular(8),
     ),
     child: Text(
-      "${DateFormat('h:mm a').format(date)} | Swell: ${height}m (${period}s) $dir",
+      "${DateFormat('h:mm a').format(date)} | Swell: ${height}m (${period}s)",
       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
     ),
   ),
@@ -147,45 +146,91 @@ void paint(Canvas canvas, Size size) {
 if (entries.length < 2) return;
 
 final double stepX = size.width / (entries.length - 1);
-const double maxH = 4.0; 
+const double maxH = 6.0; // Matching the 6m scale from your example
 const double topPad = 60.0;
-const double arrowY = 360.0;
+const double arrowY = 380.0;
 
 double getY(dynamic h) {
   final double val = (h is num) ? h.toDouble() : 0.0;
-  return size.height - (val / maxH * (size.height - topPad - 40));
+  return size.height - (val / maxH * (size.height - topPad - 60));
 }
 
+// 1. BACKGROUND SHADING (Day/Night Contrast)
+for (int i = 0; i < entries.length - 1; i++) {
+  final hour = DateTime.parse(entries[i]['dateTime']).hour;
+  bool isNight = hour < 6 || hour >= 18;
+  if (isNight) {
+    final rect = Rect.fromLTWH(i * stepX, topPad, stepX, size.height - topPad);
+    canvas.drawRect(rect, Paint()..color = const Color(0xFFE2E8F0));
+  }
+}
+
+// 2. HORIZONTAL GRID LINES
+final gridPaint = Paint()..color = Colors.black.withValues(alpha: 0.05)..strokeWidth = 1;
+for (int i = 0; i <= 6; i += 2) {
+  double y = getY(i.toDouble());
+  canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+  TextPainter(
+    text: TextSpan(text: "${i}m", style: const TextStyle(color: Colors.black38, fontSize: 10)),
+    textDirection: ui.TextDirection.ltr,
+  )..layout()..paint(canvas, Offset(5, y - 12));
+}
+
+// 3. DATE BOUNDARIES
 for (var boundary in dayBoundaries) {
   double x = boundary['startIndex'] * stepX;
   canvas.drawLine(Offset(x, 0), Offset(x, size.height), Paint()..color = Colors.black12);
   TextPainter(
-    text: TextSpan(text: boundary['label'], style: const TextStyle(color: Colors.black54, fontSize: 11, fontWeight: FontWeight.bold)),
+    text: TextSpan(text: boundary['label'], style: const TextStyle(color: Colors.black87, fontSize: 11, fontWeight: FontWeight.bold)),
     textDirection: ui.TextDirection.ltr,
   )..layout()..paint(canvas, Offset(x + 8, 20));
 }
 
-final swellPath = Path();
-swellPath.moveTo(0, getY(entries[0]['height']));
+// 4. SWELL WAVE & FILL
+final path = Path();
+final fillPath = Path();
+
+double firstY = getY(entries[0]['height']);
+path.moveTo(0, firstY);
+fillPath.moveTo(0, size.height);
+fillPath.lineTo(0, firstY);
 
 for (int i = 0; i < entries.length - 1; i++) {
   double x1 = i * stepX;
   double x2 = (i + 1) * stepX;
   double y1 = getY(entries[i]['height']);
   double y2 = getY(entries[i+1]['height']);
-  swellPath.cubicTo((x1 + x2) / 2, y1, (x1 + x2) / 2, y2, x2, y2);
+  path.cubicTo((x1 + x2) / 2, y1, (x1 + x2) / 2, y2, x2, y2);
+  fillPath.cubicTo((x1 + x2) / 2, y1, (x1 + x2) / 2, y2, x2, y2);
+}
 
-  if (i % 4 == 0) {
-    _drawArrow(canvas, Offset(x1, arrowY), entries[i]['direction'] ?? '');
+fillPath.lineTo(size.width, size.height);
+fillPath.close();
+
+// Draw the gradient fill like WillyWeather
+final gradient = LinearGradient(
+  begin: Alignment.topCenter,
+  end: Alignment.bottomCenter,
+  colors: [Colors.blue.withValues(alpha: 0.3), Colors.blue.withValues(alpha: 0.01)],
+).createShader(Rect.fromLTWH(0, topPad, size.width, size.height - topPad));
+
+canvas.drawPath(fillPath, Paint()..shader = gradient);
+canvas.drawPath(path, Paint()..color = const Color(0xFF0F172A)..strokeWidth = 2.5..style = PaintingStyle.stroke);
+
+// 5. DIRECTION ARROWS
+for (int i = 0; i < entries.length; i++) {
+  if (i % 3 == 0) {
+    _drawArrow(canvas, Offset(i * stepX, arrowY), entries[i]['direction'] ?? '');
   }
 }
 
-canvas.drawPath(swellPath, Paint()..color = Colors.blue.shade900..strokeWidth = 3..style = PaintingStyle.stroke);
-
+// 6. INTERACTIVE HOVER
 if (hoverIndex != null && hoverIndex! < entries.length) {
   double hX = hoverIndex! * stepX;
-  canvas.drawLine(Offset(hX, topPad), Offset(hX, size.height), Paint()..color = Colors.black26);
-  canvas.drawCircle(Offset(hX, getY(entries[hoverIndex!]['height'])), 5, Paint()..color = Colors.blue.shade900);
+  double hY = getY(entries[hoverIndex!]['height']);
+  canvas.drawLine(Offset(hX, topPad), Offset(hX, size.height), Paint()..color = Colors.blueAccent);
+  canvas.drawCircle(Offset(hX, hY), 4, Paint()..color = Colors.white);
+  canvas.drawCircle(Offset(hX, hY), 4, Paint()..color = Colors.blue..style = PaintingStyle.stroke..strokeWidth = 2);
 }
 }
 
@@ -196,7 +241,7 @@ canvas.save();
 canvas.translate(pos.dx, pos.dy);
 canvas.rotate(angle);
 final p = Path()..moveTo(0, 5)..lineTo(0, -5)..moveTo(-3, -1)..lineTo(0, -5)..lineTo(3, -1);
-canvas.drawPath(p, Paint()..color = Colors.blueGrey..style = PaintingStyle.stroke..strokeWidth = 1.5);
+canvas.drawPath(p, Paint()..color = Colors.blue.withValues(alpha: 0.5)..style = PaintingStyle.stroke..strokeWidth = 1.5);
 canvas.restore();
 }
 
