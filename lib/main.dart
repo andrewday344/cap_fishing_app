@@ -1,12 +1,20 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-// Replace 'c_a_p' with your actual package name from pubspec.yaml if different
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:c_a_p/screens/dashboard/dashboard_screen.dart'; 
 
 void main() async {
+  // 1. Ensure Flutter bindings are ready
   WidgetsFlutterBinding.ensureInitialized();
-  await Hive.initFlutter();
-  await Hive.openBox('catches');
+
+  // 2. Fix for the "databaseFactory not initialized" error
+  // This allows the local database to run on Windows, Mac, or Linux for testing.
+  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  }
+
+  // 3. Start the app using your specific class name
   runApp(const SeacliffApp());
 }
 
@@ -16,8 +24,14 @@ class SeacliffApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      title: 'Seacliff Fishing App',
       debugShowCheckedModeBanner: false,
-      home: const DashboardScreen(isInshore: true), // This will now recognize the class [cite: 973]
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        useMaterial3: true,
+      ),
+      // Set the home screen with your inshore preference
+      home: const DashboardScreen(isInshore: true), 
     );
   }
 }
