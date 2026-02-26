@@ -4,17 +4,20 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:c_a_p/screens/dashboard/dashboard_screen.dart'; 
 
 void main() async {
-  // 1. Ensure Flutter bindings are ready
+  // 1. Essential for any async work in main
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 2. Fix for the "databaseFactory not initialized" error
-  // This allows the local database to run on Windows, Mac, or Linux for testing.
-  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
+  try {
+    // 2. Fix for Desktop/Emulator testing
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      sqfliteFfiInit();
+      databaseFactory = databaseFactoryFfi;
+    }
+  } catch (e) {
+    debugPrint("Database initialization warning: $e");
   }
 
-  // 3. Start the app using your specific class name
+  // 3. Launch the app
   runApp(const SeacliffApp());
 }
 
@@ -27,10 +30,10 @@ class SeacliffApp extends StatelessWidget {
       title: 'Seacliff Fishing App',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primarySwatch: Colors.blue,
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF004E92)),
         useMaterial3: true,
       ),
-      // Set the home screen with your inshore preference
+      // Use true for SA South Coast/Inshore safety logic
       home: const DashboardScreen(isInshore: true), 
     );
   }
