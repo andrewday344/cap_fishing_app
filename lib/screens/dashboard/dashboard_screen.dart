@@ -3,7 +3,7 @@ import 'package:geolocator/geolocator.dart';
 import '../../core/safety_engine.dart';
 import '../../services/location_service.dart';
 import '../../services/willy_weather_service.dart';
-//import '../logbook/logbook_screen.dart';
+import '../logbook/logbook_screen.dart';
 import '../catch_log/catch_log_screen.dart';
 import '../wind_forecast_screen.dart';
 import '../tide_forecast_screen.dart';
@@ -31,11 +31,9 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  // Weather & GPS State
   late Future<Map<String, dynamic>> _weatherFuture;
   double _currentSpeedKnots = 0.0;
 
-  // Preferences: Units & Ramps
   SpeedUnit _speedUnit = SpeedUnit.knots;
   TempUnit _tempUnit = TempUnit.celsius;
   
@@ -51,7 +49,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedRamp = _saRamps[0]; // Default to Seacliff
+    _selectedRamp = _saRamps[0];
     _weatherFuture = WillyWeatherService().getMarineWeather();
     _initSpeedometer();
   }
@@ -102,7 +100,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final verdict = SafetyEngine.getVerdict(widget.isInshore, windSpeedNum);
         final statusColor = SafetyEngine.getStatusColor(verdict);
 
-        // Safety Background Logic (Yellow for Caution, Red for Danger)
         final Color bgColor = verdict == SafetyVerdict.go 
             ? const Color(0xFFF1F5F9) 
             : (verdict == SafetyVerdict.caution ? Colors.yellow.shade100 : Colors.red.shade100);
@@ -148,7 +145,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(height: 15),
 
-                // TOP ROW: Distance & Boat Speed Side-by-Side
                 StreamBuilder<Position>(
                   stream: LocationService().getPositionStream(),
                   builder: (context, gpsSnapshot) {
@@ -181,7 +177,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // LARGE MENU GRID
                 GridView.count(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
@@ -234,24 +229,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 25),
                 
+                // PRIMARY ACTION
                 ElevatedButton.icon(
-                    onPressed: () => Navigator.push(
-                      context, 
-                      MaterialPageRoute(
-                        builder: (context) => CatchLogScreen(currentWeatherData: data) // Pass the weather data here
-                      )
-                    ),
-                    icon: const Icon(Icons.add_circle, size: 28),
-                    label: const Text("RECORD PRIVATE CATCH", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    style: ElevatedButton.styleFrom(
+                  onPressed: () => Navigator.push(
+                    context, 
+                    MaterialPageRoute(builder: (context) => CatchLogScreen(currentWeatherData: data))
+                  ),
+                  icon: const Icon(Icons.add_circle, size: 28),
+                  label: const Text("RECORD PRIVATE CATCH", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
                     minimumSize: const Size(double.infinity, 70),
                     backgroundColor: const Color(0xFF004E92),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                   ),
                 ),
+
+                const SizedBox(height: 10),
+
+                // SECONDARY ACTION (HISTORY)
+                TextButton(
+                  onPressed: () => Navigator.push(
+                    context, 
+                    MaterialPageRoute(builder: (context) => const LogbookScreen())
+                  ),
+                  child: const Text(
+                    "VIEW MY LOGBOOK & HISTORY", 
+                    style: TextStyle(
+                      color: Colors.blueGrey, 
+                      fontWeight: FontWeight.bold,
+                      decoration: TextDecoration.underline
+                    )
+                  ),
+                ),
+                const SizedBox(height: 20),
               ],
             ),
           ),
@@ -307,27 +320,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
 }
 
 class _BriefHeaderCard extends StatelessWidget {
-  final String label;
-  final String value;
+  final String label, value;
   final IconData icon;
   final Color color;
-
-  const _BriefHeaderCard({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.color,
-  });
+  const _BriefHeaderCard({required this.label, required this.value, required this.icon, required this.color});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.black12),
-      ),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.black12)),
       child: Column(
         children: [
           Icon(icon, color: color, size: 32),
@@ -341,19 +343,11 @@ class _BriefHeaderCard extends StatelessWidget {
 }
 
 class _LargeNavTile extends StatelessWidget {
-  final String label;
-  final String value;
+  final String label, value;
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
-
-  const _LargeNavTile({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.color,
-    required this.onTap,
-  });
+  const _LargeNavTile({required this.label, required this.value, required this.icon, required this.color, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -361,15 +355,9 @@ class _LargeNavTile extends StatelessWidget {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            )
-          ],
+          color: Colors.white, 
+          borderRadius: BorderRadius.circular(20), 
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 4))]
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
