@@ -146,102 +146,84 @@ void paint(Canvas canvas, Size size) {
 if (entries.length < 2) return;
 
 final double stepX = size.width / (entries.length - 1);
-const double maxH = 6.0; // Matching the 6m scale from your example
+const double maxH = 6.0; // Standard 6m scale
 const double topPad = 60.0;
 const double arrowY = 380.0;
 
 double getY(dynamic h) {
   final double val = (h is num) ? h.toDouble() : 0.0;
-  return size.height - (val / maxH * (size.height - topPad - 60));
+  return size.height - (val / maxH * (size.height - topPad - 80));
 }
 
-// 1. BACKGROUND SHADING (Day/Night Contrast)
+// 1. Day/Night Background Shading
 for (int i = 0; i < entries.length - 1; i++) {
   final hour = DateTime.parse(entries[i]['dateTime']).hour;
-  bool isNight = hour < 6 || hour >= 18;
-  if (isNight) {
+  if (hour < 6 || hour >= 18) {
     final rect = Rect.fromLTWH(i * stepX, topPad, stepX, size.height - topPad);
     canvas.drawRect(rect, Paint()..color = const Color(0xFFE2E8F0));
   }
 }
 
-// 2. HORIZONTAL GRID LINES
-final gridPaint = Paint()..color = Colors.black.withValues(alpha: 0.05)..strokeWidth = 1;
+// 2. Large Grid Lines (2m, 4m, 6m)
+final gridPaint = Paint()..color = Colors.black12..strokeWidth = 1;
 for (int i = 0; i <= 6; i += 2) {
   double y = getY(i.toDouble());
   canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
   TextPainter(
-    text: TextSpan(text: "${i}m", style: const TextStyle(color: Colors.black38, fontSize: 10)),
+    text: TextSpan(text: "${i}m", style: const TextStyle(color: Colors.black45, fontSize: 12, fontWeight: FontWeight.bold)),
     textDirection: ui.TextDirection.ltr,
-  )..layout()..paint(canvas, Offset(5, y - 12));
+  )..layout()..paint(canvas, Offset(5, y - 14));
 }
 
-// 3. DATE BOUNDARIES
-for (var boundary in dayBoundaries) {
-  double x = boundary['startIndex'] * stepX;
-  canvas.drawLine(Offset(x, 0), Offset(x, size.height), Paint()..color = Colors.black12);
-  TextPainter(
-    text: TextSpan(text: boundary['label'], style: const TextStyle(color: Colors.black87, fontSize: 11, fontWeight: FontWeight.bold)),
-    textDirection: ui.TextDirection.ltr,
-  )..layout()..paint(canvas, Offset(x + 8, 20));
-}
-
-// 4. SWELL WAVE & FILL
+// 3. Wave Path with Gradient Fill
 final path = Path();
 final fillPath = Path();
-
-double firstY = getY(entries[0]['height']);
-path.moveTo(0, firstY);
+path.moveTo(0, getY(entries[0]['height']));
 fillPath.moveTo(0, size.height);
-fillPath.lineTo(0, firstY);
+fillPath.lineTo(0, getY(entries[0]['height']));
 
 for (int i = 0; i < entries.length - 1; i++) {
-  double x1 = i * stepX;
-  double x2 = (i + 1) * stepX;
-  double y1 = getY(entries[i]['height']);
-  double y2 = getY(entries[i+1]['height']);
+  double x1 = i * stepX, x2 = (i + 1) * stepX;
+  double y1 = getY(entries[i]['height']), y2 = getY(entries[i+1]['height']);
   path.cubicTo((x1 + x2) / 2, y1, (x1 + x2) / 2, y2, x2, y2);
   fillPath.cubicTo((x1 + x2) / 2, y1, (x1 + x2) / 2, y2, x2, y2);
 }
-
 fillPath.lineTo(size.width, size.height);
 fillPath.close();
 
-// Draw the gradient fill like WillyWeather
 final gradient = LinearGradient(
   begin: Alignment.topCenter,
   end: Alignment.bottomCenter,
-  colors: [Colors.blue.withValues(alpha: 0.3), Colors.blue.withValues(alpha: 0.01)],
+  colors: [Colors.blue.withValues(alpha: 0.4), Colors.blue.withValues(alpha: 0.01)],
 ).createShader(Rect.fromLTWH(0, topPad, size.width, size.height - topPad));
 
 canvas.drawPath(fillPath, Paint()..shader = gradient);
-canvas.drawPath(path, Paint()..color = const Color(0xFF0F172A)..strokeWidth = 2.5..style = PaintingStyle.stroke);
+canvas.drawPath(path, Paint()..color = const Color(0xFF1E293B)..strokeWidth = 3..style = PaintingStyle.stroke);
 
-// 5. DIRECTION ARROWS
+// 4. MUCH LARGER Direction Arrows
 for (int i = 0; i < entries.length; i++) {
-  if (i % 3 == 0) {
-    _drawArrow(canvas, Offset(i * stepX, arrowY), entries[i]['direction'] ?? '');
+  if (i % 4 == 0) {
+    _drawLargeArrow(canvas, Offset(i * stepX, arrowY), entries[i]['direction'] ?? '');
   }
 }
 
-// 6. INTERACTIVE HOVER
+// 5. MUCH LARGER Hover Marker
 if (hoverIndex != null && hoverIndex! < entries.length) {
   double hX = hoverIndex! * stepX;
   double hY = getY(entries[hoverIndex!]['height']);
-  canvas.drawLine(Offset(hX, topPad), Offset(hX, size.height), Paint()..color = Colors.blueAccent);
-  canvas.drawCircle(Offset(hX, hY), 4, Paint()..color = Colors.white);
-  canvas.drawCircle(Offset(hX, hY), 4, Paint()..color = Colors.blue..style = PaintingStyle.stroke..strokeWidth = 2);
+  canvas.drawCircle(Offset(hX, hY), 8, Paint()..color = Colors.white);
+  canvas.drawCircle(Offset(hX, hY), 8, Paint()..color = Colors.blue.shade900..style = PaintingStyle.stroke..strokeWidth = 3);
 }
 }
 
-void _drawArrow(Canvas canvas, Offset pos, String dir) {
+void _drawLargeArrow(Canvas canvas, Offset pos, String dir) {
 if (dir.isEmpty) return;
 final double angle = _getAngle(dir);
 canvas.save();
 canvas.translate(pos.dx, pos.dy);
 canvas.rotate(angle);
-final p = Path()..moveTo(0, 5)..lineTo(0, -5)..moveTo(-3, -1)..lineTo(0, -5)..lineTo(3, -1);
-canvas.drawPath(p, Paint()..color = Colors.blue.withValues(alpha: 0.5)..style = PaintingStyle.stroke..strokeWidth = 1.5);
+final p = Path()..moveTo(0, 10)..lineTo(0, -10)..moveTo(-5, -2)..lineTo(0, -10)..lineTo(5, -2);
+canvas.drawPath(p, Paint()..color = Colors.blue.shade900..style = PaintingStyle.stroke..strokeWidth = 2.5);
 canvas.restore();
 }
 
