@@ -1,53 +1,42 @@
-import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import '../models/catch_model.dart';
 
 class DatabaseService {
   static final DatabaseService instance = DatabaseService._init();
-  static Database? _database;
+  static const String _boxName = 'catches';
 
   DatabaseService._init();
 
-  Future<Database> get database async {
-    if (_database != null) return _database!;
-    _database = await _initDB('catches.db');
-    return _database!;
-  }
-
-  Future<Database> _initDB(String filePath) async {
-    final dbPath = await getDatabasesPath();
-    final path = join(dbPath, filePath);
-    return await openDatabase(path, version: 1, onCreate: _createDB);
-  }
-
-  Future _createDB(Database db, int version) async {
-    await db.execute('''
-      CREATE TABLE catches (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        species TEXT,
-        quantity INTEGER,
-        notes TEXT,
-        date TEXT,
-        temp REAL,
-        wind REAL,
-        tide TEXT
-      )
-    ''');
+  // Initialize Hive for the web
+  Future<void> init() async {
+    await Hive.initFlutter();
+    // Register a simplified adapter or store as Map
+    if (!Hive.isBoxOpen(_boxName)) {
+      await Hive.openBox(_boxName);
+    }
   }
 
   Future<List<Catch>> readAllCatches() async {
-    final db = await instance.database;
-    final result = await db.query('catches', orderBy: 'date DESC');
-    return result.map((json) => Catch.fromMap(json)).toList();
+    final box = Hive.box(_boxName);
+    // Convert the stored maps back into Catch objects
+    return box.values.map((item) {
+      final map = Map<String, dynamic>.from(item);
+      return Catch.fromMap(map);
+    }).toList().reversed.toList(); // Newest first
   }
 
-  Future<int> update(Catch item) async {
-    final db = await instance.database;
-    return await db.update(
-      'catches',
-      item.toMap(),
-      where: 'id = ?',
-      whereArgs: [item.id],
-    );
+  Future<void> saveCatch(Catch item) async {
+    final box = Hive.box(_boxName);
+    // Generate an ID if it's new
+    final id = DateTime.now().millisecondsSinceEpoch;
+    final itemWithId = item.copy(id: id);
+    await box.put(id, itemWithId.toMap());
+  }
+
+  Future<void> update(Catch item) async {
+    final box = Hive.box(_boxName);
+    if (item.id != null) {
+      await box.put(item.id, item.toMap());
+    }
   }
 }
