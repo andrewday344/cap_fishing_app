@@ -237,10 +237,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 const SizedBox(height: 20),
                 
                 ElevatedButton.icon(
-                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CatchLogScreen())),
-                  icon: const Icon(Icons.add_circle, size: 28),
-                  label: const Text("RECORD PRIVATE CATCH", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  style: ElevatedButton.styleFrom(
+                    onPressed: () => Navigator.push(
+                      context, 
+                      MaterialPageRoute(
+                        builder: (context) => CatchLogScreen(currentWeatherData: data) // Pass the weather data here
+                      )
+                    ),
+                    icon: const Icon(Icons.add_circle, size: 28),
+                    label: const Text("RECORD PRIVATE CATCH", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
                     minimumSize: const Size(double.infinity, 70),
                     backgroundColor: const Color(0xFF004E92),
                     foregroundColor: Colors.white,

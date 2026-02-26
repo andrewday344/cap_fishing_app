@@ -1,4 +1,3 @@
-//import '../../models/catch_model.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -14,180 +13,209 @@ class FishSpecies {
   });
 }
 
+class LoggedCatch {
+  final String speciesName;
+  final int quantity;
+  final String notes;
+  final DateTime timestamp;
+  final Map<String, dynamic> environmentalData;
+
+  LoggedCatch({
+    required this.speciesName,
+    required this.quantity,
+    required this.notes,
+    required this.timestamp,
+    required this.environmentalData,
+  });
+}
+
 class CatchLogScreen extends StatefulWidget {
-  const CatchLogScreen({super.key});
+  final Map<String, dynamic>? currentWeatherData;
+  const CatchLogScreen({super.key, this.currentWeatherData});
 
   @override
   State<CatchLogScreen> createState() => _CatchLogScreenState();
 }
 
 class _CatchLogScreenState extends State<CatchLogScreen> {
-  final TextEditingController _quantityController = TextEditingController(text: "1");
+  final List<LoggedCatch> _sessionCatches = [];
+  final TextEditingController _qtyController = TextEditingController(text: "1");
+  final TextEditingController _notesController = TextEditingController();
   final TextEditingController _customFishController = TextEditingController();
   
   FishSpecies? _selectedSpecies;
-  DateTime _selectedDate = DateTime.now();
 
-  // --- SA TOP 10 & INITIAL SPECIES LIST ---
   final List<FishSpecies> _allSpecies = [
-    FishSpecies(name: "King George Whiting", isFavorite: true, pirsaInfo: "Min: 32cm (East of 136°E) | Bag: 10"),
-    FishSpecies(name: "Snapper", isFavorite: true, pirsaInfo: "CURRENT CLOSURE: Check PIRSA for zones."),
+    FishSpecies(name: "King George Whiting", isFavorite: true, pirsaInfo: "Min: 32cm | Bag: 10"),
+    FishSpecies(name: "Snapper", isFavorite: true, pirsaInfo: "CURRENT CLOSURE: Check PIRSA zones."),
     FishSpecies(name: "Squid (Calamari)", isFavorite: true, pirsaInfo: "Bag: 15 per person."),
     FishSpecies(name: "Blue Swimmer Crab", isFavorite: true, pirsaInfo: "Min: 11cm | Bag: 20."),
     FishSpecies(name: "Garfish", isFavorite: false, pirsaInfo: "Min: 23cm | Bag: 30."),
-    FishSpecies(name: "Australian Salmon", isFavorite: false, pirsaInfo: "Min: 21cm | Bag: 20."),
-    FishSpecies(name: "Mulloway", isFavorite: false, pirsaInfo: "Min: 46cm (check zone) | Bag: 2-5."),
-    FishSpecies(name: "Flathead", isFavorite: false, pirsaInfo: "Min: 30cm | Bag: 10."),
-    FishSpecies(name: "Snook", isFavorite: false, pirsaInfo: "Min: 45cm | Bag: 20."),
-    FishSpecies(name: "Tommie Ruff", isFavorite: false, pirsaInfo: "Bag: 60."),
+    FishSpecies(name: "Mulloway", isFavorite: false, pirsaInfo: "Min: 46cm | Bag: 2-5."),
   ];
+
+  void _addCatchToSession() {
+    if (_selectedSpecies == null) return;
+
+    final Map<String, dynamic> snapShot = {
+      'temp': widget.currentWeatherData?['temp'] ?? 0,
+      'wind': widget.currentWeatherData?['windKnots'] ?? 0,
+      'tide': widget.currentWeatherData?['nextTide'] ?? 'Unknown',
+    };
+
+    setState(() {
+      _sessionCatches.add(LoggedCatch(
+        speciesName: _selectedSpecies!.name,
+        quantity: int.tryParse(_qtyController.text) ?? 1,
+        notes: _notesController.text,
+        timestamp: DateTime.now(),
+        environmentalData: snapShot,
+      ));
+      
+      _selectedSpecies = null;
+      _qtyController.text = "1";
+      _notesController.clear();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Sort so favorites appear at the top
-    _allSpecies.sort((a, b) => (b.isFavorite ? 1 : 0).compareTo(a.isFavorite ? 1 : 0));
-
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
-        title: const Text("Record Private Catch", style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text("Session Log", style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.white,
-        elevation: 1,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text("WHAT DID YOU CATCH?", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
-            const SizedBox(height: 10),
-            
-            // 1. SPECIES SELECTOR TILE
-            GestureDetector(
-              onTap: () => _showSpeciesPicker(),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.blue.withValues(alpha: 0.3), width: 2),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.set_meal, color: Colors.blue, size: 30),
-                    const SizedBox(width: 15),
-                    Expanded(
-                      child: Text(
-                        _selectedSpecies?.name ?? "Select Species...",
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: _selectedSpecies == null ? Colors.black38 : Colors.black87,
+      body: Column(
+        children: [
+          Expanded(
+            flex: 2,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSpeciesSelector(),
+                  const SizedBox(height: 20),
+                  _buildQtyAndNotes(),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: _selectedSpecies == null ? null : _addCatchToSession,
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 50),
+                      backgroundColor: Colors.blue.shade800,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text("ADD TO TODAY'S LOG"),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const Divider(height: 1),
+          Container(
+            padding: const EdgeInsets.all(12),
+            color: Colors.white,
+            alignment: Alignment.centerLeft,
+            child: Text("TODAY'S CATCHES (${_sessionCatches.length})", 
+              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+          ),
+          Expanded(
+            flex: 3,
+            child: _sessionCatches.isEmpty 
+              ? const Center(child: Text("No catches added yet today."))
+              : ListView.builder(
+                  itemCount: _sessionCatches.length,
+                  itemBuilder: (context, index) {
+                    final item = _sessionCatches[index];
+                    return Card(
+                      margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+                      child: ListTile(
+                        leading: const CircleAvatar(child: Icon(Icons.set_meal)),
+                        title: Text("${item.quantity} x ${item.speciesName}"),
+                        subtitle: Text("${DateFormat('h:mm a').format(item.timestamp)} - ${item.notes.isEmpty ? 'No notes' : item.notes}"),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete_outline, color: Colors.red),
+                          onPressed: () => setState(() => _sessionCatches.removeAt(index)),
                         ),
                       ),
-                    ),
-                    const Icon(Icons.arrow_drop_down, size: 30),
-                  ],
+                    );
+                  },
                 ),
-              ),
-            ),
-
-            // 2. PIRSA INFO BOX (Dynamic based on selection)
-            if (_selectedSpecies != null) ...[
-              const SizedBox(height: 15),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: Colors.orange.shade50, borderRadius: BorderRadius.circular(8)),
-                child: Row(
-                  children: [
-                    const Icon(Icons.info_outline, color: Colors.orange),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        _selectedSpecies!.pirsaInfo,
-                        style: const TextStyle(fontSize: 13, color: Colors.brown, fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-
-            const SizedBox(height: 25),
-            
-            // 3. QUANTITY SELECTOR
-            const Text("HOW MANY?", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                _qtyBtn(Icons.remove, () => _updateQty(-1)),
-                Expanded(
-                  child: TextField(
-                    controller: _quantityController,
-                    textAlign: TextAlign.center,
-                    keyboardType: TextInputType.number,
-                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                    decoration: const InputDecoration(border: OutlineInputBorder()),
-                  ),
-                ),
-                _qtyBtn(Icons.add, () => _updateQty(1)),
-              ],
-            ),
-
-            const SizedBox(height: 30),
-
-            // 4. DATE/TIME SELECTOR
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text("Date of Catch", style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text(DateFormat('EEEE, MMM d, yyyy').format(_selectedDate)),
-              trailing: const Icon(Icons.calendar_month, color: Colors.blue),
-              onTap: () async {
-                final date = await showDatePicker(
-                  context: context,
-                  initialDate: _selectedDate,
-                  firstDate: DateTime(2020),
-                  lastDate: DateTime.now(),
-                );
-                if (date != null) {
-                  setState(() => _selectedDate = date);
-                }
-              },
-            ),
-
-            const SizedBox(height: 40),
-
-            // 5. SAVE BUTTON
-            ElevatedButton(
-              onPressed: _selectedSpecies == null ? null : () => _saveCatch(),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: ElevatedButton(
+              onPressed: _sessionCatches.isEmpty ? null : () => Navigator.pop(context),
               style: ElevatedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 65),
                 backgroundColor: const Color(0xFF004E92),
                 foregroundColor: Colors.white,
-                minimumSize: const Size(double.infinity, 70),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              child: const Text("SAVE TO LOGBOOK", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              child: const Text("FINISH & SAVE SESSION", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSpeciesSelector() {
+    return GestureDetector(
+      onTap: () => _showSpeciesPicker(),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.blue.shade100),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.search, color: Colors.blue),
+            const SizedBox(width: 15),
+            Text(_selectedSpecies?.name ?? "Find Species...", 
+              style: TextStyle(fontSize: 18, color: _selectedSpecies == null ? Colors.grey : Colors.black)),
           ],
         ),
       ),
     );
   }
 
-  // --- UI HELPERS ---
-
-  Widget _qtyBtn(IconData icon, VoidCallback tap) {
-    return IconButton(
-      onPressed: tap,
-      icon: Icon(icon, size: 40, color: Colors.blue),
+  Widget _buildQtyAndNotes() {
+    return Column(
+      children: [
+        Row(
+          children: [
+            const Text("QTY: ", style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(width: 10),
+            SizedBox(
+              width: 80,
+              child: TextField(
+                controller: _qtyController,
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.zero),
+              ),
+            ),
+            const SizedBox(width: 20),
+            const Expanded(child: Text("Notes (e.g. Depth, Bait, Rig)")),
+          ],
+        ),
+        const SizedBox(height: 15),
+        TextField(
+          controller: _notesController,
+          maxLines: 2,
+          decoration: const InputDecoration(
+            hintText: "Enter catch notes here...",
+            fillColor: Colors.white,
+            filled: true,
+            border: OutlineInputBorder(),
+          ),
+        ),
+      ],
     );
-  }
-
-  void _updateQty(int delta) {
-    int current = int.tryParse(_quantityController.text) ?? 0;
-    if (current + delta >= 0) {
-      setState(() => _quantityController.text = (current + delta).toString());
-    }
   }
 
   void _showSpeciesPicker() {
@@ -195,68 +223,55 @@ class _CatchLogScreenState extends State<CatchLogScreen> {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Container(
-              height: MediaQuery.of(context).size.height * 0.8,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              child: Column(
-                children: [
-                  Container(width: 40, height: 5, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10))),
-                  const SizedBox(height: 20),
-                  const Text("Select Species", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 15),
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: _allSpecies.length + 1,
-                      itemBuilder: (context, i) {
-                        if (i == _allSpecies.length) {
-                          return _buildAddCustomTile(setModalState);
-                        }
-                        final fish = _allSpecies[i];
-                        return ListTile(
-                          leading: Icon(Icons.set_meal, color: fish.isFavorite ? Colors.red : Colors.grey),
-                          title: Text(fish.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-                          trailing: IconButton(
-                            icon: Icon(fish.isFavorite ? Icons.favorite : Icons.favorite_border, color: Colors.red),
-                            onPressed: () {
-                              setState(() => fish.isFavorite = !fish.isFavorite);
-                              setModalState(() {}); // Refresh modal list
-                            },
-                          ),
-                          onTap: () {
-                            setState(() => _selectedSpecies = fish);
-                            Navigator.pop(context);
-                          },
-                        );
-                      },
-                    ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) {
+          return Container(
+            height: MediaQuery.of(context).size.height * 0.7,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            child: Column(
+              children: [
+                const SizedBox(
+                  width: 40,
+                  height: 5,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(color: Colors.black12, borderRadius: BorderRadius.all(Radius.circular(10))),
                   ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+                ),
+                const SizedBox(height: 20),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: _allSpecies.length + 1,
+                    itemBuilder: (context, i) {
+                      if (i == _allSpecies.length) return _buildAddCustomTile(setModalState);
+                      final fish = _allSpecies[i];
+                      return ListTile(
+                        title: Text(fish.name),
+                        trailing: Icon(fish.isFavorite ? Icons.favorite : Icons.favorite_border, color: Colors.red),
+                        onTap: () {
+                          setState(() => _selectedSpecies = fish);
+                          Navigator.pop(context);
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 
   Widget _buildAddCustomTile(Function setModalState) {
     return Padding(
-      padding: const EdgeInsets.only(top: 20, bottom: 40),
+      padding: const EdgeInsets.symmetric(vertical: 20),
       child: Column(
         children: [
           const Divider(),
-          const Text("Can't find your fish?", style: TextStyle(fontStyle: FontStyle.italic)),
-          const SizedBox(height: 10),
           TextField(
             controller: _customFishController,
-            decoration: const InputDecoration(
-              hintText: "Enter custom species name",
-              border: OutlineInputBorder(),
-              suffixIcon: Icon(Icons.add_circle_outline),
-            ),
+            decoration: const InputDecoration(hintText: "Add custom species...", border: OutlineInputBorder()),
           ),
           const SizedBox(height: 10),
           ElevatedButton(
@@ -270,18 +285,10 @@ class _CatchLogScreenState extends State<CatchLogScreen> {
                 Navigator.pop(context);
               }
             },
-            child: const Text("ADD & SET AS FAVORITE"),
+            child: const Text("ADD SPECIES"),
           ),
         ],
       ),
     );
-  }
-
-  void _saveCatch() {
-    // This will eventually link to the Notification Module logic
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Logged ${_quantityController.text} x ${_selectedSpecies!.name}!")),
-    );
-    Navigator.pop(context);
   }
 }
