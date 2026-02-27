@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../core/safety_engine.dart';
+import '../../core/notification_engine.dart'; // Added for Point 4
 import '../../services/location_service.dart';
 import '../../services/willy_weather_service.dart';
 import '../logbook/logbook_screen.dart';
@@ -50,8 +51,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _selectedRamp = _saRamps[0];
-    _weatherFuture = WillyWeatherService().getMarineWeather();
+    _weatherFuture = _fetchWeatherAndCheckMatches(); // Point 4: Initial check
     _initSpeedometer();
+  }
+
+  // Point 4: Helper to wrap the weather fetch with the notification check
+  Future<Map<String, dynamic>> _fetchWeatherAndCheckMatches() async {
+    final data = await WillyWeatherService().getMarineWeather();
+    _checkForFishingMatch(data);
+    return data;
   }
 
   void _initSpeedometer() async {
@@ -75,8 +83,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _handleRefresh() {
     setState(() {
-      _weatherFuture = WillyWeatherService().getMarineWeather();
+      _weatherFuture = _fetchWeatherAndCheckMatches(); // Point 4: Refresh check
     });
+  }
+
+  // Point 4: Notification logic integration
+  void _checkForFishingMatch(Map<String, dynamic> liveData) async {
+    String? alertMessage = await NotificationEngine.checkConditions(liveData);
+    
+    if (alertMessage != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.stars, color: Colors.white),
+              const SizedBox(width: 10),
+              Expanded(child: Text(alertMessage)),
+            ],
+          ),
+          backgroundColor: Colors.green.shade700,
+          duration: const Duration(seconds: 8),
+          behavior: SnackBarBehavior.floating,
+          action: SnackBarAction(
+            label: "LOGBOOK", 
+            textColor: Colors.white,
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const LogbookScreen())),
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -310,6 +345,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             title: Text(_saRamps[i].name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             onTap: () {
               setState(() => _selectedRamp = _saRamps[i]);
+              _handleRefresh(); // Point 4: Trigger refresh check on ramp change
               Navigator.pop(context);
             },
           ),
