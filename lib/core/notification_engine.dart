@@ -2,9 +2,8 @@ import '../models/catch_model.dart';
 import '../services/database_service.dart';
 
 class NotificationEngine {
-  // Define how 'close' the weather needs to be to trigger a match
-  static const double windThreshold = 3.0; // +/- 3 knots
-  static const double tempThreshold = 2.0; // +/- 2 degrees
+  static const double windTolerance = 4.0; 
+  static const double tempTolerance = 3.0; 
 
   static Future<String?> checkConditions(Map<String, dynamic> currentData) async {
     final List<Catch> history = await DatabaseService.instance.readAllCatches();
@@ -13,18 +12,26 @@ class NotificationEngine {
 
     final double curWind = (currentData['windKnots'] as num).toDouble();
     final double curTemp = (currentData['temp'] as num).toDouble();
-    final String curTide = currentData['nextTide'] ?? "";
+    final String curTide = (currentData['nextTide'] ?? "").toString().toLowerCase();
 
     for (var record in history) {
-      // Logic: If wind is similar AND temp is similar AND it's the same tide phase
-      bool windMatch = (record.wind - curWind).abs() <= windThreshold;
-      bool tempMatch = (record.temp - curTemp).abs() <= tempThreshold;
-      bool tideMatch = record.tide.contains(curTide.split(' ')[0]); // Simplified match
+      bool windMatch = (record.wind - curWind).abs() <= windTolerance;
+      bool tempMatch = (record.temp - curTemp).abs() <= tempTolerance; // Now we use this!
+      
+      bool tideMatch = false;
+      if (record.tide.isNotEmpty && curTide.isNotEmpty) {
+        String logTide = record.tide.split(' ')[0].toLowerCase();
+        if (curTide.contains(logTide)) {
+          tideMatch = true;
+        }
+      }
 
-      if (windMatch && tempMatch && tideMatch) {
-        return "Conditions match your ${record.species} catch! Get the gear ready.";
+      // Check all three for a high-confidence "Intel" match
+      if (windMatch && tideMatch && tempMatch) {
+        return "Conditions match your ${record.species} catch! Time to hit the water.";
       }
     }
-    return null;
+
+    return null; 
   }
 }

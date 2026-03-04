@@ -1,23 +1,36 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart'; // This fixes the 'Color' and 'Colors' errors
 
-enum SafetyVerdict { go, caution, stayHome }
+enum SafetyVerdict { go, caution, stay }
 
 class SafetyEngine {
-  static const double inshoreLimit = 15.0; 
-  static const double offshoreLimit = 22.0;
+  static SafetyVerdict getVerdict(bool isInshore, double windSpeed, String warning) {
+    
+    // 1. HARD OVERRIDE: Active Marine Warnings take priority
+    if (warning != 'NIL' && warning.isNotEmpty) {
+      String upperWarning = warning.toUpperCase();
+      if (upperWarning.contains("GALE") || upperWarning.contains("STORM") || upperWarning.contains("DANGEROUS")) {
+        return SafetyVerdict.stay;
+      }
+      return SafetyVerdict.caution;
+    }
 
-  static SafetyVerdict getVerdict(bool isInshore, double windSpeed) {
-    double limit = isInshore ? inshoreLimit : offshoreLimit;
-    if (windSpeed < limit - 5) return SafetyVerdict.go;
-    if (windSpeed < limit) return SafetyVerdict.caution;
-    return SafetyVerdict.stayHome;
+    // 2. Standard Wind Logic
+    if (isInshore) {
+      if (windSpeed <= 15) return SafetyVerdict.go;
+      if (windSpeed <= 20) return SafetyVerdict.caution;
+      return SafetyVerdict.stay;
+    } else {
+      if (windSpeed <= 12) return SafetyVerdict.go;
+      if (windSpeed <= 15) return SafetyVerdict.caution;
+      return SafetyVerdict.stay;
+    }
   }
 
   static Color getStatusColor(SafetyVerdict verdict) {
     switch (verdict) {
-      case SafetyVerdict.go: return Colors.green;
-      case SafetyVerdict.caution: return Colors.orange;
-      case SafetyVerdict.stayHome: return Colors.red;
+      case SafetyVerdict.go: return Colors.green.shade700;
+      case SafetyVerdict.caution: return Colors.orange.shade800;
+      case SafetyVerdict.stay: return Colors.red.shade900;
     }
   }
 }

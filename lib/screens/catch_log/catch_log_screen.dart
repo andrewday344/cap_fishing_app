@@ -47,20 +47,18 @@ class _CatchLogScreenState extends State<CatchLogScreen> {
   
   FishSpecies? _selectedSpecies;
 
-  // Updated SA Species List for 2026
   final List<FishSpecies> _allSpecies = [
-    FishSpecies(name: "King George Whiting", isFavorite: true, pirsaInfo: "Min: 32cm (East of 136°E) | Bag: 10"),
-    FishSpecies(name: "Snapper", isFavorite: true, pirsaInfo: "Strict zone closures apply. Check PIRSA."),
-    FishSpecies(name: "Squid (Calamari)", isFavorite: true, pirsaInfo: "Bag: 15 per person | Boat: 45."),
+    FishSpecies(name: "King George Whiting", isFavorite: true, pirsaInfo: "Min: 32cm | Bag: 10"),
+    FishSpecies(name: "Snapper", isFavorite: true, pirsaInfo: "CURRENT CLOSURE: Check PIRSA zones."),
+    FishSpecies(name: "Squid (Calamari)", isFavorite: true, pirsaInfo: "Bag: 15 per person."),
     FishSpecies(name: "Blue Swimmer Crab", isFavorite: true, pirsaInfo: "Min: 11cm | Bag: 20."),
     FishSpecies(name: "Garfish", isFavorite: false, pirsaInfo: "Min: 23cm | Bag: 30."),
-    FishSpecies(name: "Mulloway", isFavorite: false, pirsaInfo: "Min: 46cm (Check Coorong specs)"),
+    FishSpecies(name: "Mulloway", isFavorite: false, pirsaInfo: "Min: 46cm | Bag: 2-5."),
   ];
 
   void _addCatchToSession() {
     if (_selectedSpecies == null) return;
 
-    // Snapshot of conditions at time of catch for your future Notification Engine
     final Map<String, dynamic> snapShot = {
       'temp': widget.currentWeatherData?['temp'] ?? 0,
       'wind': widget.currentWeatherData?['windKnots'] ?? 0,
@@ -82,7 +80,6 @@ class _CatchLogScreenState extends State<CatchLogScreen> {
     });
   }
 
-  // Finalizes the session and saves each record to Hive (Browser Storage)
   void _saveSession() async {
     for (var log in _sessionCatches) {
       final newCatch = Catch(
@@ -94,16 +91,15 @@ class _CatchLogScreenState extends State<CatchLogScreen> {
         wind: (log.environmentalData['wind'] as num).toDouble(),
         tide: log.environmentalData['tide'],
       );
-      
       await DatabaseService.instance.saveCatch(newCatch);
     }
     
-    if (!mounted) return;
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Session saved to your private logs.")),
-    );
-    Navigator.pop(context);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Session recorded locally!")),
+      );
+      Navigator.pop(context);
+    }
   }
 
   @override
@@ -228,7 +224,7 @@ class _CatchLogScreenState extends State<CatchLogScreen> {
               ),
             ),
             const SizedBox(width: 20),
-            const Expanded(child: Text("Notes (e.g. Depth, Bait)")),
+            const Expanded(child: Text("Notes (e.g. Depth, Bait, Rig)")),
           ],
         ),
         const SizedBox(height: 15),
@@ -236,7 +232,7 @@ class _CatchLogScreenState extends State<CatchLogScreen> {
           controller: _notesController,
           maxLines: 2,
           decoration: const InputDecoration(
-            hintText: "Enter details (e.g. 'off Seacliff reef')...",
+            hintText: "Enter catch notes here...",
             fillColor: Colors.white,
             filled: true,
             border: OutlineInputBorder(),
@@ -258,7 +254,13 @@ class _CatchLogScreenState extends State<CatchLogScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             child: Column(
               children: [
-                const SizedBox(width: 40, height: 5, child: DecoratedBox(decoration: BoxDecoration(color: Colors.black12))),
+                const SizedBox(
+                  width: 40,
+                  height: 5,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(color: Colors.black12, borderRadius: BorderRadius.all(Radius.circular(10))),
+                  ),
+                ),
                 const SizedBox(height: 20),
                 Expanded(
                   child: ListView.builder(
@@ -268,7 +270,6 @@ class _CatchLogScreenState extends State<CatchLogScreen> {
                       final fish = _allSpecies[i];
                       return ListTile(
                         title: Text(fish.name),
-                        subtitle: Text(fish.pirsaInfo, style: const TextStyle(fontSize: 12, color: Colors.blueGrey)),
                         trailing: Icon(fish.isFavorite ? Icons.favorite : Icons.favorite_border, color: Colors.red),
                         onTap: () {
                           setState(() => _selectedSpecies = fish);
@@ -287,28 +288,31 @@ class _CatchLogScreenState extends State<CatchLogScreen> {
   }
 
   Widget _buildAddCustomTile(Function setModalState) {
-    return Column(
-      children: [
-        const Divider(),
-        TextField(
-          controller: _customFishController,
-          decoration: const InputDecoration(hintText: "Add custom species...", border: OutlineInputBorder()),
-        ),
-        const SizedBox(height: 10),
-        ElevatedButton(
-          onPressed: () {
-            if (_customFishController.text.isNotEmpty) {
-              final newFish = FishSpecies(name: _customFishController.text, isFavorite: true);
-              setState(() {
-                _allSpecies.add(newFish);
-                _selectedSpecies = newFish;
-              });
-              Navigator.pop(context);
-            }
-          },
-          child: const Text("ADD NEW SPECIES"),
-        ),
-      ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      child: Column(
+        children: [
+          const Divider(),
+          TextField(
+            controller: _customFishController,
+            decoration: const InputDecoration(hintText: "Add custom species...", border: OutlineInputBorder()),
+          ),
+          const SizedBox(height: 10),
+          ElevatedButton(
+            onPressed: () {
+              if (_customFishController.text.isNotEmpty) {
+                final newFish = FishSpecies(name: _customFishController.text, isFavorite: true);
+                setState(() {
+                  _allSpecies.add(newFish);
+                  _selectedSpecies = newFish;
+                });
+                Navigator.pop(context);
+              }
+            },
+            child: const Text("ADD SPECIES"),
+          ),
+        ],
+      ),
     );
   }
 }

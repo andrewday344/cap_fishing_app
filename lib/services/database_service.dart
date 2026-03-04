@@ -3,14 +3,13 @@ import '../models/catch_model.dart';
 
 class DatabaseService {
   static final DatabaseService instance = DatabaseService._init();
-  static const String _boxName = 'catches';
+  static const String _boxName = 'catches_v2';
 
   DatabaseService._init();
 
-  // Initialize Hive for the web
+  // Call this in your main.dart
   Future<void> init() async {
     await Hive.initFlutter();
-    // Register a simplified adapter or store as Map
     if (!Hive.isBoxOpen(_boxName)) {
       await Hive.openBox(_boxName);
     }
@@ -18,16 +17,15 @@ class DatabaseService {
 
   Future<List<Catch>> readAllCatches() async {
     final box = Hive.box(_boxName);
-    // Convert the stored maps back into Catch objects
+    // Convert Hive's dynamic map back to our Catch model
     return box.values.map((item) {
-      final map = Map<String, dynamic>.from(item);
-      return Catch.fromMap(map);
-    }).toList().reversed.toList(); // Newest first
+      return Catch.fromMap(Map<String, dynamic>.from(item));
+    }).toList().reversed.toList();
   }
 
   Future<void> saveCatch(Catch item) async {
     final box = Hive.box(_boxName);
-    // Generate an ID if it's new
+    // Use timestamp as a unique ID for local storage
     final id = DateTime.now().millisecondsSinceEpoch;
     final itemWithId = item.copy(id: id);
     await box.put(id, itemWithId.toMap());

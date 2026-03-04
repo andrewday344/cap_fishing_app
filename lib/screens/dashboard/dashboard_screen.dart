@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../core/safety_engine.dart';
-import '../../core/notification_engine.dart'; // Added for Point 4
+import '../../core/notification_engine.dart'; 
 import '../../services/location_service.dart';
 import '../../services/willy_weather_service.dart';
 import '../logbook/logbook_screen.dart';
@@ -51,11 +51,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _selectedRamp = _saRamps[0];
-    _weatherFuture = _fetchWeatherAndCheckMatches(); // Point 4: Initial check
+    _weatherFuture = _fetchWeatherAndCheckMatches(); 
     _initSpeedometer();
   }
 
-  // Point 4: Helper to wrap the weather fetch with the notification check
   Future<Map<String, dynamic>> _fetchWeatherAndCheckMatches() async {
     final data = await WillyWeatherService().getMarineWeather();
     _checkForFishingMatch(data);
@@ -83,11 +82,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _handleRefresh() {
     setState(() {
-      _weatherFuture = _fetchWeatherAndCheckMatches(); // Point 4: Refresh check
+      _weatherFuture = _fetchWeatherAndCheckMatches(); 
     });
   }
 
-  // Point 4: Notification logic integration
   void _checkForFishingMatch(Map<String, dynamic> liveData) async {
     String? alertMessage = await NotificationEngine.checkConditions(liveData);
     
@@ -132,8 +130,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
         }
 
         final double windSpeedNum = (data['windKnots'] is num) ? data['windKnots'].toDouble() : 0.0;
-        final verdict = SafetyEngine.getVerdict(widget.isInshore, windSpeedNum);
+        final String currentWarning = data['warning'] ?? 'NIL';
+
+        // PASS WARNING TO ENGINE: Updated for safety override
+        final verdict = SafetyEngine.getVerdict(widget.isInshore, windSpeedNum, currentWarning);
         final statusColor = SafetyEngine.getStatusColor(verdict);
+
+        // DYNAMIC MESSAGE: Prioritizes active marine warnings
+        String displayMessage;
+        if (currentWarning != 'NIL') {
+          displayMessage = "ACTIVE WARNING: ${currentWarning.toUpperCase()}";
+        } else {
+          displayMessage = verdict == SafetyVerdict.go 
+              ? "GOOD TO LAUNCH" 
+              : (verdict == SafetyVerdict.caution ? "PROCEED WITH CAUTION" : "STAY INSHORE");
+        }
 
         final Color bgColor = verdict == SafetyVerdict.go 
             ? const Color(0xFFF1F5F9) 
@@ -175,7 +186,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   const LinearProgressIndicator(minHeight: 2),
                 
                 Text(
-                  verdict == SafetyVerdict.go ? "GOOD TO LAUNCH" : (verdict == SafetyVerdict.caution ? "PROCEED WITH CAUTION" : "STAY INSHORE"),
+                  displayMessage,
+                  textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: statusColor),
                 ),
                 const SizedBox(height: 15),
@@ -266,7 +278,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(height: 25),
                 
-                // PRIMARY ACTION
                 ElevatedButton.icon(
                   onPressed: () => Navigator.push(
                     context, 
@@ -284,7 +295,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                 const SizedBox(height: 10),
 
-                // SECONDARY ACTION (HISTORY)
                 TextButton(
                   onPressed: () => Navigator.push(
                     context, 
@@ -345,7 +355,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             title: Text(_saRamps[i].name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             onTap: () {
               setState(() => _selectedRamp = _saRamps[i]);
-              _handleRefresh(); // Point 4: Trigger refresh check on ramp change
+              _handleRefresh(); 
               Navigator.pop(context);
             },
           ),
