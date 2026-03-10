@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 import '../../services/database_service.dart';
 import '../../models/safety_item_model.dart';
-import '../safety/safety_equipment_screen.dart'; // Import your new screen
-// ... existing imports (Wind, Tide, Swell, CatchLog, Logbook)
+import '../safety/safety_equipment_screen.dart';
+import '../catch_log/catch_log_screen.dart';
+import '../logbook/logbook_screen.dart';
+import '../wind_forecast_screen.dart';
+import '../tide_forecast_screen.dart';
+import '../swell_forecast_screen.dart';
+import '../fish_gallery_screen.dart';
+import '../../services/willy_weather_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   final bool isInshore;
@@ -13,81 +19,152 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  // Existing weather/location variables...
+  late Future<Map<String, dynamic>> _weatherFuture;
   List<SafetyItem> _safetyGear = [];
+  bool _isSafetyLoading = true;
 
   @override
   void initState() {
     super.initState();
+    _weatherFuture = WillyWeatherService().getMarineWeather();
     _loadSafetyStatus();
-    // ... your existing init code
   }
 
   Future<void> _loadSafetyStatus() async {
     final gear = await DatabaseService.instance.getAllSafetyItems();
-    setState(() => _safetyGear = gear);
+    if (mounted) {
+      setState(() {
+        _safetyGear = gear;
+        _isSafetyLoading = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Check if anything is expired or expiring soon
+    // Logic for the Safety Summary Card
     final expiredCount = _safetyGear.where((item) => item.daysUntilExpiry < 0).length;
     final warningCount = _safetyGear.where((item) => item.daysUntilExpiry >= 0 && item.daysUntilExpiry < 30).length;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
-        title: const Text("SEACLIFF FISHING", style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text("SEACLIFF FISHING", style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+        centerTitle: true,
+        backgroundColor: Colors.white,
+        elevation: 0,
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: () => _loadSafetyStatus()),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              setState(() => _weatherFuture = WillyWeatherService().getMarineWeather());
+              _loadSafetyStatus();
+            },
+          ),
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- MODULE 1: SAFETY SUMMARY (Dynamic) ---
+            // --- SECTION 1: SAFETY STATUS ---
             _buildSafetySummaryCard(expiredCount, warningCount),
-            const SizedBox(height: 20),
+            const SizedBox(height: 25),
 
-            // --- MODULE 2: NAVIGATION HUB ---
-            _buildSectionHeader("ENVIRONMENT"),
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 3,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
+            // --- SECTION 2: ENVIRONMENT (Weather) ---
+            _buildSectionLabel("MARINE ENVIRONMENT"),
+            const SizedBox(height: 10),
+            FutureBuilder<Map<String, dynamic>>(
+              future: _weatherFuture,
+              builder: (context, snapshot) {
+                final data = snapshot.data;
+                return Row(
+                  children: [
+                    _NavSmallTile(
+                      label: "Wind",
+                      icon: Icons.air,
+                      color: Colors.blue,
+                      value: data != null ? "${data['windKnots']}kts" : "--",
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => WindForecastScreen(forecastData: data?['forecasts']))),
+                    ),
+                    const SizedBox(width: 10),
+                    _NavSmallTile(
+                      label: "Tides",
+                      icon: Icons.tsunami,
+                      color: Colors.cyan,
+                      value: "View",
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => TideForecastScreen(forecastData: data?['forecasts']))),
+                    ),
+                    const SizedBox(width: 10),
+                    _NavSmallTile(
+                      label: "Swell",
+                      icon: Icons.waves,
+                      color: Colors.indigo,
+                      value: "View",
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => SwellForecastScreen(forecastData: data?['forecasts']))),
+                    ),
+                  ],
+                );
+              },
+            ),
+
+            const SizedBox(height: 25),
+
+            // --- SECTION 3: FISHING TOOLS ---
+            _buildSectionLabel("FISHING LOGS"),
+            const SizedBox(height: 10),
+            Row(
               children: [
-                _NavIconTile(label: "Wind", icon: Icons.air, color: Colors.blue, onTap: () {}),
-                _NavIconTile(label: "Tides", icon: Icons.tsunami, color: Colors.blueAccent, onTap: () {}),
-                _NavIconTile(label: "Swell", icon: Icons.waves, color: Colors.indigo, onTap: () {}),
+                Expanded(
+                  child: _NavLargeTile(
+                    label: "New Catch",
+                    subText: "Private Record",
+                    icon: Icons.add_box_rounded,
+                    color: Colors.green.shade700,
+                    onTap: () async {
+                      final weather = await _weatherFuture;
+                      if (context.mounted) {
+                        Navigator.push(context, MaterialPageRoute(builder: (context) => CatchLogScreen(currentWeatherData: weather)));
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _NavLargeTile(
+                    label: "Logbook",
+                    subText: "History & Intel",
+                    icon: Icons.menu_book_rounded,
+                    color: Colors.orange.shade800,
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const LogbookScreen())),
+                  ),
+                ),
               ],
             ),
-            
-            const SizedBox(height: 20),
-            _buildSectionHeader("MY FISHING"),
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 2,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: 1.5,
-              children: [
-                _NavLargeTile(label: "Record Catch", sub: "Private Log", icon: Icons.add_circle, color: Colors.green, onTap: () {}),
-                _NavLargeTile(label: "Logbook", sub: "History & Intel", icon: Icons.history, color: Colors.orange, onTap: () {}),
-              ],
-            ),
 
-            const SizedBox(height: 20),
-            _buildSectionHeader("VESSEL & SAFETY"),
-            _NavLargeTile(
-              label: "Safety Equipment", 
-              sub: "Track Expiry Dates", 
-              icon: Icons.shield, 
-              color: const Color(0xFF004E92), 
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SafetyEquipmentScreen())).then((_) => _loadSafetyStatus()),
+            const SizedBox(height: 25),
+
+            // --- SECTION 4: VESSEL & COMPLIANCE ---
+            _buildSectionLabel("VESSEL & COMPLIANCE"),
+            const SizedBox(height: 10),
+            _NavWideTile(
+              label: "Safety Equipment Gallery",
+              subText: "Track Flare & EPIRB Expiries",
+              icon: Icons.shield_rounded,
+              color: const Color(0xFF004E92),
+              onTap: () => Navigator.push(
+                context, 
+                MaterialPageRoute(builder: (context) => const SafetyEquipmentScreen())
+              ).then((_) => _loadSafetyStatus()),
+            ),
+            const SizedBox(height: 12),
+            _NavWideTile(
+              label: "Fish Species Gallery",
+              subText: "SA Size & Bag Limits",
+              icon: Icons.set_meal_rounded,
+              color: Colors.teal,
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const FishGalleryScreen())),
             ),
           ],
         ),
@@ -95,97 +172,137 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Widget _buildSectionLabel(String text) {
+    return Text(text, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blueGrey.shade600, letterSpacing: 1.1));
+  }
+
   Widget _buildSafetySummaryCard(int expired, int warning) {
+    if (_isSafetyLoading) return const SizedBox(height: 80, child: Center(child: CircularProgressIndicator()));
+    
     Color cardColor = Colors.green.shade600;
-    String text = "All systems clear";
-    IconData icon = Icons.check_circle;
+    String title = "VESSEL READY";
+    String subtitle = "All safety gear is in date";
+    IconData icon = Icons.check_circle_outline;
 
     if (expired > 0) {
       cardColor = Colors.red.shade700;
-      text = "$expired ITEMS EXPIRED";
-      icon = Icons.error;
+      title = "ACTION REQUIRED";
+      subtitle = "$expired ITEMS EXPIRED";
+      icon = Icons.gpp_bad_rounded;
     } else if (warning > 0) {
       cardColor = Colors.orange.shade700;
-      text = "$warning items expiring soon";
-      icon = Icons.warning;
+      title = "MAINTENANCE DUE";
+      subtitle = "$warning items expiring soon";
+      icon = Icons.pending_actions_rounded;
     }
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: cardColor,
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
-        BoxShadow(
-          color: cardColor.withValues(alpha: 0.3), // Updated to modern Flutter syntax
-          blurRadius: 10, 
-          offset: const Offset(0, 4)
-        )
-      ],
+          BoxShadow(color: cardColor.withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 6)),
+        ],
       ),
       child: Row(
         children: [
-          Icon(icon, color: Colors.white, size: 40),
+          Icon(icon, color: Colors.white, size: 44),
           const SizedBox(width: 15),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text("VESSEL READINESS", style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
-                Text(text, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+                Text(title, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
+                Text(subtitle, style: const TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w500)),
               ],
             ),
           ),
+          const Icon(Icons.arrow_forward_ios, color: Colors.white24, size: 18),
         ],
       ),
     );
   }
-
-  Widget _buildSectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Align(alignment: Alignment.centerLeft, child: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.blueGrey))),
-    );
-  }
 }
 
-// --- HELPER UI WIDGETS ---
+// --- REUSABLE HUB TILES ---
 
-class _NavIconTile extends StatelessWidget {
-  final String label; final IconData icon; final Color color; final VoidCallback onTap;
-  const _NavIconTile({required this.label, required this.icon, required this.color, required this.onTap});
+class _NavSmallTile extends StatelessWidget {
+  final String label, value; final IconData icon; final Color color; final VoidCallback onTap;
+  const _NavSmallTile({required this.label, required this.value, required this.icon, required this.color, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15)),
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(icon, color: color), const SizedBox(height: 5), Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))]),
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 15),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.black12)),
+          child: Column(
+            children: [
+              Icon(icon, color: color, size: 28),
+              const SizedBox(height: 5),
+              Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              Text(value, style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w900)),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
 class _NavLargeTile extends StatelessWidget {
-  final String label, sub; final IconData icon; final Color color; final VoidCallback onTap;
-  const _NavLargeTile({required this.label, required this.sub, required this.icon, required this.color, required this.onTap});
+  final String label, subText; final IconData icon; final Color color; final VoidCallback onTap;
+  const _NavLargeTile({required this.label, required this.subText, required this.icon, required this.color, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(15),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15)),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: Colors.black12)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: color, size: 30),
-            const SizedBox(height: 10),
-            Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            Text(sub, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+            Icon(icon, color: color, size: 36),
+            const SizedBox(height: 15),
+            Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+            Text(subText, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NavWideTile extends StatelessWidget {
+  final String label, subText; final IconData icon; final Color color; final VoidCallback onTap;
+  const _NavWideTile({required this.label, required this.subText, required this.icon, required this.color, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.black12)),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 32),
+            const SizedBox(width: 15),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                  Text(subText, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: Colors.black26),
           ],
         ),
       ),
