@@ -50,7 +50,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
-        title: const Text("SMALL BOAT FISHING", style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+        title: const Text("CONDITIONS ARE PERFECT", style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2)),
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 0,
@@ -177,6 +177,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
               icon: Icons.set_meal_rounded,
               color: Colors.teal,
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const FishGalleryScreen())),
+            ),
+            _NavWideTile(
+              label: "Pre-Launch Checklist",
+              subText: "Final checks before hitting the ramp",
+              icon: Icons.checklist_rtl_rounded,
+              color: Colors.deepPurple,
+              onTap: () async {
+                // Await the weather future to get the latest data
+                final data = await _weatherFuture; 
+                if (context.mounted) {
+                  Navigator.push(
+                    context, 
+                    MaterialPageRoute(builder: (context) => PreLaunchScreen(weatherSnapshot: data))
+                  );
+                }
+              },
             ),
           ],
         ),

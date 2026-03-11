@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import '../../models/checklist_item_model.dart';
 
 class PreLaunchScreen extends StatefulWidget {
-  const PreLaunchScreen({super.key});
+  final Map<String, dynamic>? weatherSnapshot; // Accept live data from Dashboard
+  const PreLaunchScreen({super.key, this.weatherSnapshot});
 
   @override
   State<PreLaunchScreen> createState() => _PreLaunchScreenState();
 }
 
 class _PreLaunchScreenState extends State<PreLaunchScreen> {
-  // Initial list of tasks specific to SA boaters
   final List<ChecklistItem> _items = [
     ChecklistItem(id: '1', task: "Bungs installed and tight", category: "VESSEL"),
     ChecklistItem(id: '2', task: "Battery switch ON", category: "VESSEL"),
@@ -34,7 +34,6 @@ class _PreLaunchScreenState extends State<PreLaunchScreen> {
           TextButton(
             onPressed: () {
               setState(() {
-                // FIXED: Using a standard for loop instead of .forEach
                 for (var item in _items) {
                   item.isCompleted = false;
                 }
@@ -52,13 +51,48 @@ class _PreLaunchScreenState extends State<PreLaunchScreen> {
               padding: const EdgeInsets.all(16),
               itemCount: _items.length,
               separatorBuilder: (context, index) => const SizedBox(height: 10),
-              itemBuilder: (context, index) {
-                final item = _items[index];
-                return _buildCheckTile(item);
-              },
+              itemBuilder: (context, index) => _buildCheckTile(_items[index]),
             ),
           ),
+          
+          // --- NEW: WEATHER LAST LOOK BAR ---
+          if (widget.weatherSnapshot != null) _buildWeatherLastLook(),
+
           _buildLaunchButton(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWeatherLastLook() {
+    final wind = widget.weatherSnapshot!['windKnots'] ?? 0;
+    final dir = widget.weatherSnapshot!['windDir'] ?? '--';
+    final isWindy = wind > 15;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      decoration: BoxDecoration(
+        color: isWindy ? Colors.orange.shade50 : Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: isWindy ? Colors.orange.shade200 : Colors.blue.shade200),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.air, color: isWindy ? Colors.orange.shade800 : Colors.blue.shade800, size: 20),
+          const SizedBox(width: 10),
+          const Text("Live Wind: ", style: TextStyle(fontWeight: FontWeight.bold)),
+          Text("$wind kts $dir", style: TextStyle(
+            fontWeight: FontWeight.w900, 
+            color: isWindy ? Colors.orange.shade900 : Colors.blue.shade900
+          )),
+          const SizedBox(width: 10),
+          Icon(
+            isWindy ? Icons.warning_amber_rounded : Icons.check_circle_outline, 
+            size: 18, 
+            color: isWindy ? Colors.orange : Colors.blue
+          ),
         ],
       ),
     );
