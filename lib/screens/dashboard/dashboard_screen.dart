@@ -50,7 +50,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
-        title: const Text("CONDITIONS ARE PERFECT", style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+        title: const Text("Conditions are perfect", style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2)),
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 0,

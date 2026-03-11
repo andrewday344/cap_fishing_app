@@ -1,28 +1,30 @@
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/catch_model.dart';
-import '../models/safety_item_model.dart'; 
+import '../models/safety_item_model.dart';
+import '../models/vessel_log_model.dart'; // FIXED: Added missing import
 
 class DatabaseService {
   static final DatabaseService instance = DatabaseService._init();
   
-  // Box names for organization
   static const String _catchBoxName = 'catches_v2';
   static const String _safetyBoxName = 'safety_gear';
+  static const String _vesselBoxName = 'vessel_logs'; // Vessel box name
 
   DatabaseService._init();
 
-  /// Initializes Hive and opens all necessary local storage boxes
   Future<void> init() async {
     await Hive.initFlutter();
     
-    // Open Catch Log Box
     if (!Hive.isBoxOpen(_catchBoxName)) {
       await Hive.openBox(_catchBoxName);
     }
     
-    // Open Safety Equipment Box
     if (!Hive.isBoxOpen(_safetyBoxName)) {
       await Hive.openBox(_safetyBoxName);
+    }
+
+    if (!Hive.isBoxOpen(_vesselBoxName)) {
+      await Hive.openBox(_vesselBoxName);
     }
   }
 
@@ -42,7 +44,6 @@ class DatabaseService {
     await box.put(id, itemWithId.toMap());
   }
 
-  // RESTORED: Renamed from updateCatch back to update to fix your error
   Future<void> update(Catch item) async {
     final box = Hive.box(_catchBoxName);
     if (item.id != null) {
@@ -66,6 +67,32 @@ class DatabaseService {
 
   Future<void> deleteSafetyItem(String id) async {
     final box = Hive.box(_safetyBoxName);
+    await box.delete(id);
+  }
+
+  // --- VESSEL LOG METHODS ---
+
+  Future<void> saveVesselLog(VesselLog log) async {
+    final box = Hive.box(_vesselBoxName);
+    await box.put(log.id, log.toMap());
+  }
+
+  Future<List<VesselLog>> getAllVesselLogs() async {
+    final box = Hive.box(_vesselBoxName);
+    
+    // Map the items to a list of VesselLog objects
+    final List<VesselLog> logs = box.values.map((item) {
+      return VesselLog.fromMap(Map<String, dynamic>.from(item));
+    }).toList();
+
+    // FIXED: Null-safe sorting logic for 2026 Dart standards
+    logs.sort((a, b) => b.date.compareTo(a.date));
+    
+    return logs;
+  }
+
+  Future<void> deleteVesselLog(String id) async {
+    final box = Hive.box(_vesselBoxName);
     await box.delete(id);
   }
 }
