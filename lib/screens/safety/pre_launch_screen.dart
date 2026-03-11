@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/checklist_item_model.dart';
 
 class PreLaunchScreen extends StatefulWidget {
-  final Map<String, dynamic>? weatherSnapshot; // Accept live data from Dashboard
+  final Map<String, dynamic>? weatherSnapshot; 
   const PreLaunchScreen({super.key, this.weatherSnapshot});
 
   @override
@@ -10,6 +10,7 @@ class PreLaunchScreen extends StatefulWidget {
 }
 
 class _PreLaunchScreenState extends State<PreLaunchScreen> {
+  // Categorized SA checklist
   final List<ChecklistItem> _items = [
     ChecklistItem(id: '1', task: "Bungs installed and tight", category: "VESSEL"),
     ChecklistItem(id: '2', task: "Battery switch ON", category: "VESSEL"),
@@ -46,6 +47,8 @@ class _PreLaunchScreenState extends State<PreLaunchScreen> {
       body: Column(
         children: [
           _buildProgressHeader(),
+          
+          // Main Checklist
           Expanded(
             child: ListView.separated(
               padding: const EdgeInsets.all(16),
@@ -55,7 +58,7 @@ class _PreLaunchScreenState extends State<PreLaunchScreen> {
             ),
           ),
           
-          // --- NEW: WEATHER LAST LOOK BAR ---
+          // The "Live Wind" Last Look bar - Keeping this exactly as you liked it
           if (widget.weatherSnapshot != null) _buildWeatherLastLook(),
 
           _buildLaunchButton(),
@@ -67,10 +70,10 @@ class _PreLaunchScreenState extends State<PreLaunchScreen> {
   Widget _buildWeatherLastLook() {
     final wind = widget.weatherSnapshot!['windKnots'] ?? 0;
     final dir = widget.weatherSnapshot!['windDir'] ?? '--';
-    final isWindy = wind > 15;
+    final isWindy = wind > 15; // Threshold for caution at Seacliff/North Haven
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       decoration: BoxDecoration(
         color: isWindy ? Colors.orange.shade50 : Colors.blue.shade50,
