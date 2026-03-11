@@ -233,8 +233,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(height: 25),
 
-                // 4. FISHING TOOLS
-                _buildSectionLabel("FISHING LOGS"),
+                // --- SECTION 4: FISHING LOGS & INTEL ---
+                _buildSectionLabel("FISHING LOGS & INTEL"),
                 Row(
                   children: [
                     Expanded(
@@ -258,7 +258,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 12),
+                _NavWideTile(
+                  label: "Fish Species Gallery",
+                  subText: "SA Size & Bag Limits",
+                  icon: Icons.set_meal_rounded,
+                  color: Colors.teal,
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const FishGalleryScreen())),
+                ),
+
                 const SizedBox(height: 25),
+
+                // --- SECTION 5: VESSEL & COMPLIANCE ---
+                _buildSectionLabel("VESSEL & COMPLIANCE"),
+                _NavWideTile(
+                  label: "Vessel Maintenance Log",
+                  subText: "Track Engine Hours & Fuel",
+                  icon: Icons.handyman_rounded,
+                  color: Colors.blueGrey,
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const VesselLogScreen())).then((_) => _loadVesselData()),
+                ),
+                _NavWideTile(
+                  label: "Safety Equipment Gallery",
+                  subText: "Track Flare & EPIRB Expiries",
+                  icon: Icons.shield_rounded,
+                  color: const Color(0xFF004E92),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const SafetyEquipmentScreen())).then((_) => _loadVesselData()),
+                ),
+                _NavWideTile(
+                  label: "Pre-Launch Checklist",
+                  subText: "Go/No-Go + Wind Bar",
+                  icon: Icons.checklist_rtl_rounded,
+                  color: Colors.deepPurple,
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => PreLaunchScreen(weatherSnapshot: data))),
+                ),
 
                 // 5. VESSEL & COMPLIANCE
                 _buildSectionLabel("VESSEL & COMPLIANCE"),
