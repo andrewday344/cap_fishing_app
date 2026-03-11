@@ -1,16 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import '../../core/safety_engine.dart';
+import '../../core/notification_engine.dart'; 
+import '../../services/willy_weather_service.dart';
 import '../../services/database_service.dart';
 import '../../models/safety_item_model.dart';
-import '../safety/safety_equipment_screen.dart';
-import '../catch_log/catch_log_screen.dart';
+import '../../models/vessel_log_model.dart';
 import '../logbook/logbook_screen.dart';
+import '../catch_log/catch_log_screen.dart';
 import '../wind_forecast_screen.dart';
 import '../tide_forecast_screen.dart';
-import '../swell_forecast_screen.dart';
-import '../fish_gallery_screen.dart';
-import '../../services/willy_weather_service.dart';
+//import '../swell_forecast_screen.dart';
+import '../fish_gallery_screen.dart'; // Used in the Fish Gallery tile now
+import '../safety/safety_equipment_screen.dart';
 import '../safety/pre_launch_screen.dart';
 import '../vessel/vessel_log_screen.dart';
+
+// --- MODELS & ENUMS ---
+enum SpeedUnit { knots, kmh }
+enum TempUnit { celsius, fahrenheit }
+
+class Ramp {
+  final String name;
+  final double lat;
+  final double lng;
+  Ramp(this.name, this.lat, this.lng);
+}
 
 class DashboardScreen extends StatefulWidget {
   final bool isInshore;
@@ -22,235 +37,338 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   late Future<Map<String, dynamic>> _weatherFuture;
+  double _currentSpeedKnots = 0.0;
+  SpeedUnit _speedUnit = SpeedUnit.knots;
+  TempUnit _tempUnit = TempUnit.celsius; // Now hooked into temperature formatting
+
   List<SafetyItem> _safetyGear = [];
-  bool _isSafetyLoading = true;
+  List<VesselLog> _vesselLogs = [];
+  bool _isDataLoading = true;
+  
+  final List<Ramp> _saRamps = [
+    Ramp("Seacliff", -35.0436, 138.5194),
+    Ramp("North Haven", -34.7939, 138.4844),
+    Ramp("O'Sullivan Beach", -35.1278, 138.4689),
+    Ramp("West Beach", -34.9383, 138.4994),
+    Ramp("Edithburgh", -35.0833, 137.7500),
+  ];
+  late Ramp _selectedRamp;
 
   @override
   void initState() {
     super.initState();
-    _weatherFuture = WillyWeatherService().getMarineWeather();
-    _loadSafetyStatus();
+    _selectedRamp = _saRamps[0];
+    _weatherFuture = _fetchWeatherAndCheckMatches(); 
+    _initSpeedometer();
+    _loadVesselData();
   }
 
-  Future<void> _loadSafetyStatus() async {
+  Future<void> _loadVesselData() async {
     final gear = await DatabaseService.instance.getAllSafetyItems();
+    final logs = await DatabaseService.instance.getAllVesselLogs();
     if (mounted) {
       setState(() {
         _safetyGear = gear;
-        _isSafetyLoading = false;
+        _vesselLogs = logs;
+        _isDataLoading = false;
       });
+    }
+  }
+
+  Future<Map<String, dynamic>> _fetchWeatherAndCheckMatches() async {
+    final data = await WillyWeatherService().getMarineWeather();
+    _checkForFishingMatch(data);
+    return data;
+  }
+
+  void _initSpeedometer() async {
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.bestForNavigation,
+        distanceFilter: 1,
+      ),
+    ).listen((Position position) {
+      if (mounted) {
+        setState(() {
+          _currentSpeedKnots = position.speed * 1.94384;
+        });
+      }
+    });
+  }
+
+  void _handleRefresh() {
+    setState(() {
+      _weatherFuture = _fetchWeatherAndCheckMatches(); 
+    });
+    _loadVesselData();
+  }
+
+  void _checkForFishingMatch(Map<String, dynamic> liveData) async {
+    String? alertMessage = await NotificationEngine.checkConditions(liveData);
+    if (alertMessage != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(alertMessage),
+          backgroundColor: Colors.green.shade700,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final expiredCount = _safetyGear.where((item) => item.daysUntilExpiry < 0).length;
-    final warningCount = _safetyGear.where((item) => item.daysUntilExpiry >= 0 && item.daysUntilExpiry < 30).length;
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _weatherFuture,
+      builder: (context, weatherSnapshot) {
+        Map<String, dynamic> data = {
+          'windKnots': 0,
+          'windDir': '--',
+          'temp': 0,
+          'warning': 'NIL',
+          'forecasts': null,
+        };
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF1F5F9),
-      appBar: AppBar(
-        title: const Text("Conditions are perfect", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              setState(() => _weatherFuture = WillyWeatherService().getMarineWeather());
-              _loadSafetyStatus();
-            },
+        if (weatherSnapshot.hasData) {
+          data = weatherSnapshot.data!;
+        }
+
+        final double windSpeedNum = (data['windKnots'] is num) ? data['windKnots'].toDouble() : 0.0;
+        final String currentWarning = data['warning'] ?? 'NIL';
+        
+        // Safety Verdict Logic
+        final verdict = SafetyEngine.getVerdict(widget.isInshore, windSpeedNum, currentWarning);
+        final Color statusColor = SafetyEngine.getStatusColor(verdict);
+
+        return Scaffold(
+          backgroundColor: const Color(0xFFF1F5F9),
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            title: Text(_selectedRamp.name, style: const TextStyle(fontWeight: FontWeight.w900)),
+            centerTitle: true,
+            leading: IconButton(icon: const Icon(Icons.refresh, size: 28), onPressed: _handleRefresh),
+            actions: [
+              PopupMenuButton(
+                icon: const Icon(Icons.settings, size: 28),
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    child: Text("Speed: ${_speedUnit.name.toUpperCase()}"),
+                    onTap: () => setState(() => _speedUnit = _speedUnit == SpeedUnit.knots ? SpeedUnit.kmh : SpeedUnit.knots),
+                  ),
+                  PopupMenuItem(
+                    child: Text("Temp: ${_tempUnit.name.toUpperCase()}"),
+                    onTap: () => setState(() => _tempUnit = _tempUnit == TempUnit.celsius ? TempUnit.fahrenheit : TempUnit.celsius),
+                  ),
+                ],
+              ),
+            ],
           ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // --- SECTION 1: SAFETY STATUS ---
-            _buildSafetySummaryCard(expiredCount, warningCount),
-            const SizedBox(height: 25),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 1. DYNAMIC SAFETY SUMMARY (Uses statusColor)
+                _buildSafetySummaryCard(statusColor),
+                const SizedBox(height: 20),
 
-            // --- SECTION 2: ENVIRONMENT (Weather) ---
-            _buildSectionLabel("MARINE ENVIRONMENT"),
-            const SizedBox(height: 10),
-            FutureBuilder<Map<String, dynamic>>(
-              future: _weatherFuture,
-              builder: (context, snapshot) {
-                final data = snapshot.data;
-                return Row(
+                // 2. LIVE BOAT DATA (Now uses _currentSpeedKnots)
+                _buildSectionLabel("LIVE BOAT DATA"),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _BriefHeaderCard(
+                        label: "Boat Speed",
+                        value: _formatSpeed(_currentSpeedKnots),
+                        icon: Icons.speed,
+                        color: Colors.blueAccent,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _BriefHeaderCard(
+                        label: "Total Hours",
+                        value: "${(_vesselLogs.isEmpty ? 0.0 : _vesselLogs.first.engineHours).toStringAsFixed(1)} h",
+                        icon: Icons.timer_outlined,
+                        color: Colors.blueGrey,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 25),
+
+                // 3. ENVIRONMENT
+                _buildSectionLabel("MARINE ENVIRONMENT"),
+                Row(
                   children: [
                     _NavSmallTile(
                       label: "Wind",
+                      value: "${windSpeedNum.toInt()}kts ${data['windDir']}",
                       icon: Icons.air,
                       color: Colors.blue,
-                      value: data != null ? "${data['windKnots']}kts" : "--",
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => WindForecastScreen(forecastData: data?['forecasts']))),
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => WindForecastScreen(forecastData: data['forecasts']))),
                     ),
                     const SizedBox(width: 10),
                     _NavSmallTile(
                       label: "Tides",
+                      value: data['nextTide'] ?? "View",
                       icon: Icons.tsunami,
                       color: Colors.cyan,
-                      value: "View",
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => TideForecastScreen(forecastData: data?['forecasts']))),
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => TideForecastScreen(forecastData: data['forecasts']))),
                     ),
                     const SizedBox(width: 10),
                     _NavSmallTile(
-                      label: "Swell",
-                      icon: Icons.waves,
-                      color: Colors.indigo,
-                      value: "View",
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => SwellForecastScreen(forecastData: data?['forecasts']))),
+                      label: "Temp",
+                      value: _formatTemp((data['temp'] as num).toDouble()),
+                      icon: Icons.thermostat,
+                      color: Colors.deepOrange,
+                      onTap: () {},
                     ),
                   ],
-                );
-              },
-            ),
-
-            const SizedBox(height: 25),
-
-            // --- SECTION 3: FISHING TOOLS ---
-            _buildSectionLabel("FISHING LOGS"),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: _NavLargeTile(
-                    label: "New Catch",
-                    subText: "Private Record",
-                    icon: Icons.add_box_rounded,
-                    color: Colors.green.shade700,
-                    onTap: () async {
-                      final weather = await _weatherFuture;
-                      if (context.mounted) {
-                        Navigator.push(context, MaterialPageRoute(builder: (context) => CatchLogScreen(currentWeatherData: weather)));
-                      }
-                    },
-                  ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _NavLargeTile(
-                    label: "Logbook",
-                    subText: "History & Intel",
-                    icon: Icons.menu_book_rounded,
-                    color: Colors.orange.shade800,
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const LogbookScreen())),
-                  ),
+                const SizedBox(height: 25),
+
+                // 4. FISHING TOOLS
+                _buildSectionLabel("FISHING LOGS"),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _NavLargeTile(
+                        label: "New Catch",
+                        subText: "Private Log",
+                        icon: Icons.add_box_rounded,
+                        color: Colors.green.shade700,
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => CatchLogScreen(currentWeatherData: data))),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _NavLargeTile(
+                        label: "Logbook",
+                        subText: "Intel & History",
+                        icon: Icons.menu_book_rounded,
+                        color: Colors.orange.shade800,
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const LogbookScreen())),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 25),
+
+                // 5. VESSEL & COMPLIANCE
+                _buildSectionLabel("VESSEL & COMPLIANCE"),
+                _NavWideTile(
+                  label: "Vessel Maintenance Log",
+                  subText: "Track Engine Hours & Fuel",
+                  icon: Icons.handyman_rounded,
+                  color: Colors.blueGrey,
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const VesselLogScreen())).then((_) => _loadVesselData()),
+                ),
+                _NavWideTile(
+                  label: "Safety Equipment Gallery",
+                  subText: "Track Flare & EPIRB Expiries",
+                  icon: Icons.shield_rounded,
+                  color: const Color(0xFF004E92),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const SafetyEquipmentScreen())).then((_) => _loadVesselData()),
+                ),
+                _NavWideTile(
+                  label: "Fish Species Gallery",
+                  subText: "SA Size & Bag Limits",
+                  icon: Icons.set_meal_rounded,
+                  color: Colors.teal,
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const FishGalleryScreen())),
+                ),
+                _NavWideTile(
+                  label: "Pre-Launch Checklist",
+                  subText: "Go/No-Go + Wind Bar",
+                  icon: Icons.checklist_rtl_rounded,
+                  color: Colors.deepPurple,
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => PreLaunchScreen(weatherSnapshot: data))),
                 ),
               ],
             ),
-
-            const SizedBox(height: 25),
-
-            // --- SECTION 4: VESSEL & COMPLIANCE ---
-            _buildSectionLabel("VESSEL & COMPLIANCE"),
-            const SizedBox(height: 10),
-            _NavWideTile(
-              label: "Vessel Maintenance Log",
-              subText: "Track Engine Hours & Fuel",
-              icon: Icons.handyman_rounded,
-              color: Colors.blueGrey,
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const VesselLogScreen())),
-            ),
-            const SizedBox(height: 12),
-            _NavWideTile(
-              label: "Safety Equipment Gallery",
-              subText: "Track Flare & EPIRB Expiries",
-              icon: Icons.shield_rounded,
-              color: const Color(0xFF004E92),
-              onTap: () => Navigator.push(
-                context, 
-                MaterialPageRoute(builder: (context) => const SafetyEquipmentScreen())
-              ).then((_) => _loadSafetyStatus()),
-            ),
-            const SizedBox(height: 12),
-            _NavWideTile(
-              label: "Fish Species Gallery",
-              subText: "SA Size & Bag Limits",
-              icon: Icons.set_meal_rounded,
-              color: Colors.teal,
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const FishGalleryScreen())),
-            ),
-            const SizedBox(height: 12),
-            _NavWideTile(
-              label: "Pre-Launch Checklist",
-              subText: "Final checks + Live Wind Bar",
-              icon: Icons.checklist_rtl_rounded,
-              color: Colors.deepPurple,
-              onTap: () async {
-                final data = await _weatherFuture; 
-                if (context.mounted) {
-                  Navigator.push(
-                    context, 
-                    MaterialPageRoute(builder: (context) => PreLaunchScreen(weatherSnapshot: data))
-                  );
-                }
-              },
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
+  // --- UI HELPERS ---
+
   Widget _buildSectionLabel(String text) {
-    return Text(text, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blueGrey.shade600, letterSpacing: 1.1));
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Text(text, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blueGrey.shade600, letterSpacing: 1.1)),
+    );
   }
 
-  Widget _buildSafetySummaryCard(int expired, int warning) {
-    if (_isSafetyLoading) return const SizedBox(height: 80, child: Center(child: CircularProgressIndicator()));
+  Widget _buildSafetySummaryCard(Color safetyEngineColor) {
+    if (_isDataLoading) return const LinearProgressIndicator();
+
+    final expired = _safetyGear.where((i) => i.daysUntilExpiry < 0).length;
+    final warning = _safetyGear.where((i) => i.daysUntilExpiry >= 0 && i.daysUntilExpiry < 30).length;
     
-    Color cardColor = Colors.green.shade600;
+    bool serviceOverdue = false;
+    if (_vesselLogs.isNotEmpty) {
+      final lastSvc = _vesselLogs.firstWhere((l) => l.isServiceRecord, orElse: () => _vesselLogs.last);
+      if (_vesselLogs.first.engineHours - lastSvc.engineHours >= 100) serviceOverdue = true;
+    }
+
+    // Default to SafetyEngine's recommendation
+    Color finalColor = safetyEngineColor;
     String title = "VESSEL READY";
-    String subtitle = "All safety gear is in date";
-    IconData icon = Icons.check_circle_outline;
+    String subtitle = "Conditions: Perfect";
 
     if (expired > 0) {
-      cardColor = Colors.red.shade700;
+      finalColor = Colors.red.shade700;
       title = "ACTION REQUIRED";
       subtitle = "$expired ITEMS EXPIRED";
-      icon = Icons.gpp_bad_rounded;
-    } else if (warning > 0) {
-      cardColor = Colors.orange.shade700;
+    } else if (warning > 0 || serviceOverdue) {
+      finalColor = Colors.orange.shade700;
       title = "MAINTENANCE DUE";
-      subtitle = "$warning items expiring soon";
-      icon = Icons.pending_actions_rounded;
+      subtitle = serviceOverdue ? "Service Overdue (100h)" : "Safety gear expiring soon";
     }
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: cardColor,
+        color: finalColor,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(color: cardColor.withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 6)),
-        ],
+        boxShadow: [BoxShadow(color: finalColor.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 4))],
       ),
       child: Row(
         children: [
-          Icon(icon, color: Colors.white, size: 44),
+          const Icon(Icons.check_circle, color: Colors.white, size: 40),
           const SizedBox(width: 15),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
-                Text(subtitle, style: const TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w500)),
+                Text(title, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                Text(subtitle, style: const TextStyle(color: Colors.white70)),
               ],
             ),
           ),
-          const Icon(Icons.arrow_forward_ios, color: Colors.white24, size: 18),
         ],
       ),
     );
   }
+
+  String _formatSpeed(double s) => _speedUnit == SpeedUnit.kmh 
+      ? "${(s * 1.852).toStringAsFixed(1)} km/h" 
+      : "${s.toStringAsFixed(1)} kts";
+
+  String _formatTemp(double t) => _tempUnit == TempUnit.fahrenheit 
+      ? "${((t * 9/5) + 32).toStringAsFixed(0)}°F" 
+      : "${t.toStringAsFixed(0)}°C";
 }
 
-// --- RESTORED REUSABLE HUB TILES ---
+// --- HELPER CLASSES ---
 
 class _NavSmallTile extends StatelessWidget {
   final String label, value; final IconData icon; final Color color; final VoidCallback onTap;
@@ -269,7 +387,7 @@ class _NavSmallTile extends StatelessWidget {
               Icon(icon, color: color, size: 28),
               const SizedBox(height: 5),
               Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-              Text(value, style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w900)),
+              Text(value, style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w900)),
             ],
           ),
         ),
@@ -309,27 +427,51 @@ class _NavWideTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.black12)),
-        child: Row(
-          children: [
-            Icon(icon, color: color, size: 32),
-            const SizedBox(width: 15),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                  Text(subText, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                ],
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.black12)),
+          child: Row(
+            children: [
+              Icon(icon, color: color, size: 32),
+              const SizedBox(width: 15),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                    Text(subText, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  ],
+                ),
               ),
-            ),
-            const Icon(Icons.chevron_right, color: Colors.black26),
-          ],
+              const Icon(Icons.chevron_right, color: Colors.black26),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+class _BriefHeaderCard extends StatelessWidget {
+  final String label, value; final IconData icon; final Color color;
+  const _BriefHeaderCard({required this.label, required this.value, required this.icon, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.black12)),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 28),
+          const SizedBox(height: 5),
+          Text(label, style: const TextStyle(fontSize: 10, color: Colors.black54)),
+          Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        ],
       ),
     );
   }
