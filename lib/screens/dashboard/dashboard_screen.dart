@@ -9,6 +9,7 @@ import '../tide_forecast_screen.dart';
 import '../swell_forecast_screen.dart';
 import '../fish_gallery_screen.dart';
 import '../../services/willy_weather_service.dart';
+import '../safety/pre_launch_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final bool isInshore;
@@ -49,7 +50,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
-        title: const Text("SEACLIFF FISHING", style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+        title: const Text("SMALL BOAT FISHING", style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2)),
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 0,
@@ -157,6 +158,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 context, 
                 MaterialPageRoute(builder: (context) => const SafetyEquipmentScreen())
               ).then((_) => _loadSafetyStatus()),
+            ),
+            // Inside Section 4 of your Dashboard Column
+            _NavWideTile(
+              label: "Pre-Launch Checklist",
+              subText: "Final checks before hitting the ramp",
+              icon: Icons.checklist_rtl_rounded,
+              color: Colors.deepPurple,
+              onTap: () => Navigator.push(
+                context, 
+                MaterialPageRoute(builder: (context) => const PreLaunchScreen())
+              ),
             ),
             const SizedBox(height: 12),
             _NavWideTile(
