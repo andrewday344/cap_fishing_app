@@ -10,6 +10,7 @@ import '../swell_forecast_screen.dart';
 import '../fish_gallery_screen.dart';
 import '../../services/willy_weather_service.dart';
 import '../safety/pre_launch_screen.dart';
+import '../vessel/vessel_log_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final bool isInshore;
@@ -43,14 +44,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Logic for the Safety Summary Card
     final expiredCount = _safetyGear.where((item) => item.daysUntilExpiry < 0).length;
     final warningCount = _safetyGear.where((item) => item.daysUntilExpiry >= 0 && item.daysUntilExpiry < 30).length;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
-        title: const Text("Conditions are perfect", style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+        title: const Text("Conditions are perfect", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 0,
@@ -150,6 +150,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
             _buildSectionLabel("VESSEL & COMPLIANCE"),
             const SizedBox(height: 10),
             _NavWideTile(
+              label: "Vessel Maintenance Log",
+              subText: "Track Engine Hours & Fuel",
+              icon: Icons.handyman_rounded,
+              color: Colors.blueGrey,
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const VesselLogScreen())),
+            ),
+            const SizedBox(height: 12),
+            _NavWideTile(
               label: "Safety Equipment Gallery",
               subText: "Track Flare & EPIRB Expiries",
               icon: Icons.shield_rounded,
@@ -159,17 +167,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 MaterialPageRoute(builder: (context) => const SafetyEquipmentScreen())
               ).then((_) => _loadSafetyStatus()),
             ),
-            // Inside Section 4 of your Dashboard Column
-            _NavWideTile(
-              label: "Pre-Launch Checklist",
-              subText: "Final checks before hitting the ramp",
-              icon: Icons.checklist_rtl_rounded,
-              color: Colors.deepPurple,
-              onTap: () => Navigator.push(
-                context, 
-                MaterialPageRoute(builder: (context) => const PreLaunchScreen())
-              ),
-            ),
             const SizedBox(height: 12),
             _NavWideTile(
               label: "Fish Species Gallery",
@@ -178,13 +175,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
               color: Colors.teal,
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const FishGalleryScreen())),
             ),
+            const SizedBox(height: 12),
             _NavWideTile(
               label: "Pre-Launch Checklist",
-              subText: "Final checks before hitting the ramp",
+              subText: "Final checks + Live Wind Bar",
               icon: Icons.checklist_rtl_rounded,
               color: Colors.deepPurple,
               onTap: () async {
-                // Await the weather future to get the latest data
                 final data = await _weatherFuture; 
                 if (context.mounted) {
                   Navigator.push(
@@ -253,7 +250,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 }
 
-// --- REUSABLE HUB TILES ---
+// --- RESTORED REUSABLE HUB TILES ---
 
 class _NavSmallTile extends StatelessWidget {
   final String label, value; final IconData icon; final Color color; final VoidCallback onTap;
