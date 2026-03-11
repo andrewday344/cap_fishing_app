@@ -11,7 +11,7 @@ import '../catch_log/catch_log_screen.dart';
 import '../wind_forecast_screen.dart';
 import '../tide_forecast_screen.dart';
 //import '../swell_forecast_screen.dart';
-import '../fish_gallery_screen.dart'; // Used in the Fish Gallery tile now
+import '../fish_gallery_screen.dart';
 import '../safety/safety_equipment_screen.dart';
 import '../safety/pre_launch_screen.dart';
 import '../vessel/vessel_log_screen.dart';
@@ -39,7 +39,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   late Future<Map<String, dynamic>> _weatherFuture;
   double _currentSpeedKnots = 0.0;
   SpeedUnit _speedUnit = SpeedUnit.knots;
-  TempUnit _tempUnit = TempUnit.celsius; // Now hooked into temperature formatting
+  TempUnit _tempUnit = TempUnit.celsius;
 
   List<SafetyItem> _safetyGear = [];
   List<VesselLog> _vesselLogs = [];
@@ -140,7 +140,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final double windSpeedNum = (data['windKnots'] is num) ? data['windKnots'].toDouble() : 0.0;
         final String currentWarning = data['warning'] ?? 'NIL';
         
-        // Safety Verdict Logic
         final verdict = SafetyEngine.getVerdict(widget.isInshore, windSpeedNum, currentWarning);
         final Color statusColor = SafetyEngine.getStatusColor(verdict);
 
@@ -149,7 +148,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           appBar: AppBar(
             backgroundColor: Colors.white,
             elevation: 0,
-            title: Text(_selectedRamp.name, style: const TextStyle(fontWeight: FontWeight.w900)),
+            title: const Text("Conditions are perfect", style: TextStyle(fontWeight: FontWeight.w900)),
             centerTitle: true,
             leading: IconButton(icon: const Icon(Icons.refresh, size: 28), onPressed: _handleRefresh),
             actions: [
@@ -173,11 +172,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 1. DYNAMIC SAFETY SUMMARY (Uses statusColor)
+                // 1. SAFETY SUMMARY
                 _buildSafetySummaryCard(statusColor),
                 const SizedBox(height: 20),
 
-                // 2. LIVE BOAT DATA (Now uses _currentSpeedKnots)
+                // 2. LIVE BOAT DATA
                 _buildSectionLabel("LIVE BOAT DATA"),
                 Row(
                   children: [
@@ -233,7 +232,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(height: 25),
 
-                // --- SECTION 4: FISHING LOGS & INTEL ---
+                // 4. FISHING LOGS & INTEL
                 _buildSectionLabel("FISHING LOGS & INTEL"),
                 Row(
                   children: [
@@ -269,30 +268,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                 const SizedBox(height: 25),
 
-                // --- SECTION 5: VESSEL & COMPLIANCE ---
-                _buildSectionLabel("VESSEL & COMPLIANCE"),
-                _NavWideTile(
-                  label: "Vessel Maintenance Log",
-                  subText: "Track Engine Hours & Fuel",
-                  icon: Icons.handyman_rounded,
-                  color: Colors.blueGrey,
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const VesselLogScreen())).then((_) => _loadVesselData()),
-                ),
-                _NavWideTile(
-                  label: "Safety Equipment Gallery",
-                  subText: "Track Flare & EPIRB Expiries",
-                  icon: Icons.shield_rounded,
-                  color: const Color(0xFF004E92),
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const SafetyEquipmentScreen())).then((_) => _loadVesselData()),
-                ),
-                _NavWideTile(
-                  label: "Pre-Launch Checklist",
-                  subText: "Go/No-Go + Wind Bar",
-                  icon: Icons.checklist_rtl_rounded,
-                  color: Colors.deepPurple,
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => PreLaunchScreen(weatherSnapshot: data))),
-                ),
-
                 // 5. VESSEL & COMPLIANCE
                 _buildSectionLabel("VESSEL & COMPLIANCE"),
                 _NavWideTile(
@@ -310,18 +285,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const SafetyEquipmentScreen())).then((_) => _loadVesselData()),
                 ),
                 _NavWideTile(
-                  label: "Fish Species Gallery",
-                  subText: "SA Size & Bag Limits",
-                  icon: Icons.set_meal_rounded,
-                  color: Colors.teal,
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const FishGalleryScreen())),
-                ),
-                _NavWideTile(
                   label: "Pre-Launch Checklist",
                   subText: "Go/No-Go + Wind Bar",
                   icon: Icons.checklist_rtl_rounded,
                   color: Colors.deepPurple,
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => PreLaunchScreen(weatherSnapshot: data))),
+                  onTap: () async {
+                    final weather = await _weatherFuture;
+                    if (context.mounted) {
+                      Navigator.push(context, MaterialPageRoute(builder: (c) => PreLaunchScreen(weatherSnapshot: weather)));
+                    }
+                  },
                 ),
               ],
             ),
@@ -331,8 +304,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // --- UI HELPERS ---
-
   Widget _buildSectionLabel(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -340,57 +311,58 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildSafetySummaryCard(Color safetyEngineColor) {
-    if (_isDataLoading) return const LinearProgressIndicator();
+    Widget _buildSafetySummaryCard(Color safetyEngineColor) {
+      if (_isDataLoading) return const LinearProgressIndicator();
 
-    final expired = _safetyGear.where((i) => i.daysUntilExpiry < 0).length;
-    final warning = _safetyGear.where((i) => i.daysUntilExpiry >= 0 && i.daysUntilExpiry < 30).length;
-    
-    bool serviceOverdue = false;
-    if (_vesselLogs.isNotEmpty) {
-      final lastSvc = _vesselLogs.firstWhere((l) => l.isServiceRecord, orElse: () => _vesselLogs.last);
-      if (_vesselLogs.first.engineHours - lastSvc.engineHours >= 100) serviceOverdue = true;
-    }
+      final expired = _safetyGear.where((i) => i.daysUntilExpiry < 0).length;
+      final warning = _safetyGear.where((i) => i.daysUntilExpiry >= 0 && i.daysUntilExpiry < 30).length;
+      
+      bool serviceOverdue = false;
+      if (_vesselLogs.isNotEmpty) {
+        final lastSvc = _vesselLogs.firstWhere((l) => l.isServiceRecord, orElse: () => _vesselLogs.last);
+        if (_vesselLogs.first.engineHours - lastSvc.engineHours >= 100) serviceOverdue = true;
+      }
 
-    // Default to SafetyEngine's recommendation
-    Color finalColor = safetyEngineColor;
-    String title = "VESSEL READY";
-    String subtitle = "Conditions: Perfect";
+      Color finalColor = safetyEngineColor;
+      String title = "VESSEL READY";
+      
+      // FIXED: Using _selectedRamp here to clear the 'unused_field' warning
+      String subtitle = "Conditions at ${_selectedRamp.name}: Perfect";
 
-    if (expired > 0) {
-      finalColor = Colors.red.shade700;
-      title = "ACTION REQUIRED";
-      subtitle = "$expired ITEMS EXPIRED";
-    } else if (warning > 0 || serviceOverdue) {
-      finalColor = Colors.orange.shade700;
-      title = "MAINTENANCE DUE";
-      subtitle = serviceOverdue ? "Service Overdue (100h)" : "Safety gear expiring soon";
-    }
+      if (expired > 0) {
+        finalColor = Colors.red.shade700;
+        title = "ACTION REQUIRED";
+        subtitle = "$expired ITEMS EXPIRED";
+      } else if (warning > 0 || serviceOverdue) {
+        finalColor = Colors.orange.shade700;
+        title = "MAINTENANCE DUE";
+        subtitle = serviceOverdue ? "Service Overdue (100h)" : "Safety gear expiring soon";
+      }
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: finalColor,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: finalColor.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 4))],
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.check_circle, color: Colors.white, size: 40),
-          const SizedBox(width: 15),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                Text(subtitle, style: const TextStyle(color: Colors.white70)),
-              ],
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: finalColor,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [BoxShadow(color: finalColor.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 4))],
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.white, size: 40),
+            const SizedBox(width: 15),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                  Text(subtitle, style: const TextStyle(color: Colors.white70)),
+                ],
+              ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
+          ],
+        ),
+      );
+    }
 
   String _formatSpeed(double s) => _speedUnit == SpeedUnit.kmh 
       ? "${(s * 1.852).toStringAsFixed(1)} km/h" 
