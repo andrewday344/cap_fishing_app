@@ -1,24 +1,32 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
 class WillyWeatherService {
+  // Keeping your exact API Key and Location ID
   final String apiKey = 'MjkzZmUzMTVlYTdhNDIzNjRiZjhjZG'; 
 
   Future<Map<String, dynamic>> getMarineWeather() async {
-    // We add forecasts for wind, tides, and swell back in
+    // 1. Ditch the proxy. Direct URL is better for Native iPhone apps.
     final String targetUrl = 'https://api.willyweather.com.au/v2/$apiKey/locations/9765/weather.json?observational=true&forecasts=wind,tides,swell&days=5';
-    //final String proxyUrl = 'https://corsproxy.io/?$,'targetUrl'';
 
     try {
-      final response = await http.get(Uri.parse(targetUrl)).timeout(const Duration(seconds: 15));
+      final response = await http.get(
+        Uri.parse(targetUrl),
+        // 2. Add headers to identify the request as a mobile app
+        headers: {
+          'User-Agent': 'ConditionsArePerfect/1.0',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 15));
       
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
         final obs = data['observational']?['observations'];
         final forecasts = data['forecasts'];
 
-        // Extraction with "Null Safety" to prevent crashes
+        // 3. Kept your exact extraction and conversion logic
         return {
           'windKnots': obs != null ? (obs['wind']['speed'] / 1.852).round() : 0,
           'windDir': obs != null ? obs['wind']['directionText'] : '--',
@@ -28,18 +36,21 @@ class WillyWeatherService {
           'swellDir': _extractSwellDir(forecasts),
           'nextTide': _getNextTide(forecasts),
           'forecasts': forecasts,
-          'warning': forecasts?['warnings']?[0]?['title'] ?? 'NIL', // Extracting first warning if any
+          'warning': forecasts?['warnings']?[0]?['title'] ?? 'NIL',
           'lastUpdated': DateFormat('h:mm a').format(DateTime.now()),
         };
       } else {
         return _emptyData("Status ${response.statusCode}");
       }
+    } on SocketException {
+      return _emptyData("No Internet / Permissions");
     } catch (e) {
       return _emptyData("Connection Error");
     }
   }
 
-  // Helper to find the next tide in the list
+  // --- KEPT YOUR ORIGINAL HELPERS EXACTLY AS THEY WERE ---
+
   String _getNextTide(Map<String, dynamic>? forecasts) {
     try {
       final tideDays = forecasts?['tides']?['days'];
