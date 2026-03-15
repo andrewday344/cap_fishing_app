@@ -205,13 +205,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 _buildSectionLabel("MARINE ENVIRONMENT"),
                 Row(
                   children: [
-                    _NavSmallTile(
-                      label: "Wind",
-                      value: "${windSpeedNum.toInt()}kts ${data['windDir']}",
-                      icon: Icons.air,
-                      color: Colors.blue,
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => WindForecastScreen(forecastData: data['forecasts']))),
-                    ),
+                   _NavSmallTile(
+  label: "Wind",
+  value: "${windSpeedNum.toInt()}kts ${data['windDir']}",
+  icon: Icons.air,
+  color: Colors.blue,
+  onTap: () {
+    // SAFETY CHECK: Prevent Red Screen if API failed or is empty
+    if (data['forecasts'] == null || (data['forecasts'] as Map).isEmpty || data['forecasts']['wind'] == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Forecast data not available yet. Please refresh."))
+      );
+      return;
+    }
+    Navigator.push(
+      context, 
+      MaterialPageRoute(
+        builder: (c) => WindForecastScreen(forecastData: data['forecasts'])
+      )
+    );
+  },
+),
+
+
                     const SizedBox(width: 10),
                     _NavSmallTile(
                       label: "Tides",

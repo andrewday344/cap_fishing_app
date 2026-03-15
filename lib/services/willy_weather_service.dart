@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import 'package:flutter/foundation.dart'; // For debugPrint
+import 'package:flutter/foundation.dart';
 
 class WillyWeatherService {
   final String apiKey = 'MjkzZmUzMTVlYTdhNDIzNjRiZjhjZG'; 
@@ -10,27 +10,27 @@ class WillyWeatherService {
   Future<Map<String, dynamic>> getMarineWeather() async {
     final String targetUrl = 'https://api.willyweather.com.au/v2/$apiKey/locations/9765/weather.json?observational=true&forecasts=wind,tides,swell&days=5';
     
-    // DEBUG: Let's see exactly what we are sending
-    debugPrint("--- WILLYWEATHER DEBUG START ---");
-    debugPrint("URL: $targetUrl");
+    // Use AllOrigins proxy to bypass CORS when running in Chrome/Web simulation
+    final String proxyUrl = 'https://api.allorigins.win/raw?url=${Uri.encodeComponent(targetUrl)}';
+
+    debugPrint("--- WILLYWEATHER WEB DEBUG START ---");
+    debugPrint("Target URL: $targetUrl");
 
     try {
       final response = await http.get(
-        Uri.parse(targetUrl),
+        Uri.parse(proxyUrl),
         headers: {
-          'User-Agent': 'ConditionsArePerfect/1.0 (iPhone; iOS)',
           'Accept': 'application/json',
         },
       ).timeout(const Duration(seconds: 15));
       
-      // DEBUG: Status Check
       debugPrint("HTTP STATUS: ${response.statusCode}");
       
       if (response.statusCode == 200) {
-        debugPrint("SUCCESS: Data received.");
+        debugPrint("SUCCESS: Data received via proxy.");
         final Map<String, dynamic> data = json.decode(response.body);
         
-        // This is your original logic preserved below
+        // Using your original logic with added null-checks to prevent the red screen crash
         final obs = data['observational']?['observations'];
         final forecasts = data['forecasts'];
 
@@ -42,27 +42,27 @@ class WillyWeatherService {
           'swellHeight': _extractSwell(forecasts),
           'swellDir': _extractSwellDir(forecasts),
           'nextTide': _getNextTide(forecasts),
-          'forecasts': forecasts,
+          'forecasts': forecasts ?? {}, // Fixed: Return empty map instead of null to prevent crash
           'warning': forecasts?['warnings']?[0]?['title'] ?? 'NIL',
           'lastUpdated': DateFormat('h:mm a').format(DateTime.now()),
         };
       } else {
-        // DEBUG: Why did it fail?
         debugPrint("FAIL BODY: ${response.body}");
         return _emptyData("Error ${response.statusCode}");
       }
     } on SocketException catch (e) {
       debugPrint("NETWORK ERROR: $e");
-      return _emptyData("No Internet/DNS Error");
+      return _emptyData("No Internet");
     } catch (e) {
       debugPrint("UNEXPECTED ERROR: $e");
       return _emptyData("App Error");
     } finally {
-      debugPrint("--- WILLYWEATHER DEBUG END ---");
+      debugPrint("--- WILLYWEATHER WEB DEBUG END ---");
     }
   }
 
-  // --- YOUR ORIGINAL HELPERS (Preserved) ---
+  // --- YOUR ORIGINAL HELPERS (Fully Preserved) ---
+
   String _getNextTide(Map<String, dynamic>? forecasts) {
     try {
       final tideDays = forecasts?['tides']?['days'];
@@ -93,11 +93,24 @@ class WillyWeatherService {
     } catch (_) { return ""; }
   }
 
-  Map<String, dynamic> _emptyData(String msg) {
-    return {
-      'windKnots': 0, 'windDir': msg, 'temp': 0, 'seas': '--', 
-      'swellHeight': '--', 'swellDir': '', 'nextTide': '--',
-      'forecasts': null, 'lastUpdated': '--',
-    };
+// ... inside WillyWeatherService ...
+
+    Map<String, dynamic> _emptyData(String msg) {
+      return {
+        'windKnots': 0, 
+        'windDir': msg, 
+        'temp': 0, 
+        'seas': '--', 
+        'swellHeight': '--', 
+        'swellDir': '', 
+        'nextTide': '--',
+        // We provide the EXACT structure the forecast screens expect
+        'forecasts': {
+          'wind': {'days': []},
+          'tides': {'days': []},
+          'swell': {'days': []},
+        }, 
+        'lastUpdated': '--',
+      };
+    }
   }
-}
