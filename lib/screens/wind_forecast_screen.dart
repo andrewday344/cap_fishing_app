@@ -233,6 +233,7 @@ class WillyStyleInteractivePainter extends CustomPainter {
     canvas.restore();
   }
 
+  
   @override
   bool shouldRepaint(CustomPainter oldDelegate) => true;
 }
