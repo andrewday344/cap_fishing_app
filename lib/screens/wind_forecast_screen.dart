@@ -17,23 +17,54 @@ class _WindForecastScreenState extends State<WindForecastScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // --- 1. THE SAFETY GUARD ---
+    // This stops the RangeError: Index out of range: 0
+    if (widget.forecastData['wind'] == null || 
+        widget.forecastData['wind']['days'] == null || 
+        (widget.forecastData['wind']['days'] as List).isEmpty) {
+      return Scaffold(
+        appBar: AppBar(title: const Text("Wind Forecast")),
+        body: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.wifi_off, size: 50, color: Colors.grey),
+              SizedBox(height: 10),
+              Text("No forecast data available.", style: TextStyle(fontWeight: FontWeight.bold)),
+              Text("Please check your internet or refresh.", style: TextStyle(color: Colors.grey)),
+            ],
+          ),
+        ),
+      );
+    }
+
     List<dynamic> allEntries = [];
     List<Map<String, dynamic>> dayBoundaries = [];
 
+    // --- 2. DATA PROCESSING (Wrapped in Safety) ---
     try {
-      for (int i = 0; i < _daysToShow; i++) {
+      // Ensure we don't try to show more days than the API actually returned
+      int availableDays = (widget.forecastData['wind']['days'] as List).length;
+      int daysToProcess = math.min(_daysToShow, availableDays);
+
+      for (int i = 0; i < daysToProcess; i++) {
         var dayData = widget.forecastData['wind']['days'][i];
+        
         // Record where each day starts for the painter
-        dayBoundaries.add({
-          'startIndex': allEntries.length,
-          'label': DateFormat('E d MMM').format(DateTime.parse(dayData['entries'][0]['dateTime'])),
-        });
-        allEntries.addAll(dayData['entries']);
+        if (dayData['entries'] != null && (dayData['entries'] as List).isNotEmpty) {
+          dayBoundaries.add({
+            'startIndex': allEntries.length,
+            'label': DateFormat('E d MMM').format(DateTime.parse(dayData['entries'][0]['dateTime'])),
+          });
+          allEntries.addAll(dayData['entries']);
+        }
       }
     } catch (e) {
-      return const Scaffold(body: Center(child: Text("Data limited to 2 days")));
+      // Fallback if data structure is unexpected
+      return const Scaffold(body: Center(child: Text("Error parsing wind data")));
     }
 
+    // --- 3. THE UI (Your Original Logic) ---
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
@@ -54,12 +85,12 @@ class _WindForecastScreenState extends State<WindForecastScreen> {
                 label: Text("$day-Day"),
                 selected: _daysToShow == day,
                 onSelected: (selected) {
-                 if (selected) {
-                  setState(() {
-                    _daysToShow = day;
-                    _hoverIndex = null;
-                  });
-                }
+                  if (selected) {
+                    setState(() {
+                      _daysToShow = day;
+                      _hoverIndex = null;
+                    });
+                  }
                 },
               ),
             )).toList(),
@@ -75,7 +106,7 @@ class _WindForecastScreenState extends State<WindForecastScreen> {
                   onPanUpdate: (details) => _handleTouch(details.localPosition, allEntries, context),
                   onTapDown: (details) => _handleTouch(details.localPosition, allEntries, context),
                   child: Container(
-                    height: 350, // Increased height to fit dates at top
+                    height: 350, 
                     width: double.infinity,
                     decoration: BoxDecoration(
                       color: Colors.white,
@@ -98,8 +129,9 @@ class _WindForecastScreenState extends State<WindForecastScreen> {
   }
 
   void _handleTouch(Offset localPosition, List<dynamic> entries, BuildContext context) {
+    if (entries.isEmpty) return; // Guard for empty touch
     double chartWidth = MediaQuery.of(context).size.width - 20;
-    double stepX = chartWidth / (entries.length - 1);
+    double stepX = chartWidth / (entries.length > 1 ? entries.length - 1 : 1);
     int index = (localPosition.dx / stepX).round();
     if (index >= 0 && index < entries.length) setState(() => _hoverIndex = index);
   }
@@ -108,7 +140,7 @@ class _WindForecastScreenState extends State<WindForecastScreen> {
     final date = DateTime.parse(entry['dateTime']);
     final knots = (entry['speed'] / 1.852).round();
     return Positioned(
-      bottom: 20, // Tooltip at bottom to stay clear of dates
+      bottom: 20, 
       left: 20,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -119,6 +151,8 @@ class _WindForecastScreenState extends State<WindForecastScreen> {
     );
   }
 }
+
+// --- WillyStyleInteractivePainter and _drawArrow remain unchanged ---
 
 class WillyStyleInteractivePainter extends CustomPainter {
   final List<dynamic> entries;
