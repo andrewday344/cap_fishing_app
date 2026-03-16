@@ -22,7 +22,7 @@ class WillyWeatherService {
         headers: {
           'Accept': 'application/json',
         },
-      ).timeout(const Duration(seconds: 15));
+      ).timeout(const Duration(seconds: 30));
       
       debugPrint("HTTP STATUS: ${response.statusCode}");
       
@@ -98,19 +98,16 @@ class WillyWeatherService {
     Map<String, dynamic> _emptyData(String msg) {
       return {
         'windKnots': 0, 
-        'windDir': msg, 
+        'windDir': msg, // This will show "Timed Out" on the tile
         'temp': 0, 
         'seas': '--', 
-        'swellHeight': '--', 
-        'swellDir': '', 
         'nextTide': '--',
-        // We provide the EXACT structure the forecast screens expect
+        'lastUpdated': '--',
         'forecasts': {
           'wind': {'days': []},
           'tides': {'days': []},
           'swell': {'days': []},
         }, 
-        'lastUpdated': '--',
       };
     }
   }
