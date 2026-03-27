@@ -166,11 +166,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 itemBuilder: (context) => [
                   PopupMenuItem(
                     child: Text("Speed: ${_speedUnit.name.toUpperCase()}"),
-                    onTap: () => setState(() => _speedUnit = _speedUnit == SpeedUnit.knots ? SpeedUnit.kmh : SpeedUnit.knots),
+                    onTap: () => setState(() => _speedUnit = _speedUnit == SpeedUnit.kmh ? SpeedUnit.knots : SpeedUnit.kmh),
                   ),
                   PopupMenuItem(
                     child: Text("Temp: ${_tempUnit.name.toUpperCase()}"),
-                    onTap: () => setState(() => _tempUnit = _tempUnit == TempUnit.celsius ? TempUnit.fahrenheit : TempUnit.celsius),
+                    onTap: () => setState(() => _tempUnit = _tempUnit == TempUnit.fahrenheit ? TempUnit.celsius : TempUnit.fahrenheit),
                   ),
                  PopupMenuItem(
                     child: const Text("Vessel Settings"),
