@@ -220,8 +220,7 @@ class WillyStyleInteractivePainter extends CustomPainter {
           Paint()..color = Colors.blue.withValues(alpha: 0.5)..strokeWidth = 1);
     }
   }
-
-  void _drawArrow(Canvas canvas, double x, double y, String dir, double speed) {
+void _drawArrow(Canvas canvas, double x, double y, String dir, double speed) {
     Color arrowColor = speed < 10 ? Colors.green : (speed < 18 ? Colors.lightBlue : Colors.orange);
     Map<String, double> directions = {'N': 0, 'NE': 45, 'E': 90, 'SE': 135, 'S': 180, 'SW': 225, 'W': 270, 'NW': 315};
     double angle = (directions[dir.toUpperCase().substring(0, math.min(dir.length, 2))] ?? 0) * (math.pi / 180);
@@ -229,11 +228,22 @@ class WillyStyleInteractivePainter extends CustomPainter {
     canvas.save();
     canvas.translate(x, y);
     canvas.rotate(angle);
-    canvas.drawPath(Path()..moveTo(0, -6)..lineTo(3, 3)..lineTo(0, 1)..lineTo(-3, 3)..close(), Paint()..color = arrowColor);
+    
+    // Coordinates multiplied by 1.5 for a 50% size increase:
+    // Original (0, -6) -> (0, -9)
+    // Original (3, 3)  -> (4.5, 4.5)
+    // Original (0, 1)  -> (0, 1.5)
+    // Original (-3, 3) -> (-4.5, 4.5)
+    canvas.drawPath(
+      Path()
+        ..moveTo(0, -9)
+        ..lineTo(4.5, 4.5)
+        ..lineTo(0, 1.5)
+        ..lineTo(-4.5, 4.5)
+        ..close(), 
+      Paint()..color = arrowColor
+    );
+    
     canvas.restore();
   }
-
-  
-  @override
-  bool shouldRepaint(CustomPainter oldDelegate) => true;
 }

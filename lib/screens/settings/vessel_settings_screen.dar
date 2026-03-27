@@ -1,0 +1,73 @@
+import 'package:flutter/material.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import '../../models/vessel_profile.dart';
+
+class VesselSettingsScreen extends StatefulWidget {
+  const VesselSettingsScreen({super.key});
+
+  @override
+  State<VesselSettingsScreen> createState() => _VesselSettingsScreenState();
+}
+
+class _VesselSettingsScreenState extends State<VesselSettingsScreen> {
+  late Box<VesselProfile> _vesselBox;
+  double _currentLength = 4.8;
+  final TextEditingController _nameController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _vesselBox = Hive.box<VesselProfile>('vessel_profile');
+    final existing = _vesselBox.get('my_boat');
+    if (existing != null) {
+      _currentLength = existing.length;
+      _nameController.text = existing.name;
+    }
+  }
+
+  void _saveProfile() {
+    final profile = VesselProfile(
+      name: _nameController.text.isEmpty ? "My Boat" : _nameController.text,
+      length: _currentLength,
+    );
+    _vesselBox.put('my_boat', profile);
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Vessel Profile")),
+      body: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          children: [
+            TextField(
+              controller: _nameController,
+              decoration: const InputDecoration(labelText: "Vessel Name", border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 30),
+            Text("Vessel Length: ${_currentLength.toStringAsFixed(1)}m", 
+                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Slider(
+              value: _currentLength,
+              min: 2.0,
+              max: 12.0,
+              divisions: 100,
+              label: "${_currentLength.toStringAsFixed(1)}m",
+              onChanged: (val) => setState(() => _currentLength = val),
+            ),
+            const Text("This determines your legal lifejacket requirements.", 
+                       style: TextStyle(color: Colors.grey, fontSize: 12)),
+            const Spacer(),
+            ElevatedButton(
+              onPressed: _saveProfile,
+              style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
+              child: const Text("SAVE PROFILE"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

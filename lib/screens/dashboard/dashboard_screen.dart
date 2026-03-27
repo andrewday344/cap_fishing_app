@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:hive_flutter/hive_flutter.dart'; // Added for Box usage
 import '../../core/safety_engine.dart';
 import '../../core/notification_engine.dart'; 
 import '../../services/willy_weather_service.dart';
 import '../../services/database_service.dart';
 import '../../models/safety_item_model.dart';
 import '../../models/vessel_log_model.dart';
+import '../../models/vessel_profile.dart'; // Ensure this matches your filename
 import '../logbook/logbook_screen.dart';
 import '../catch_log/catch_log_screen.dart';
 import '../wind_forecast_screen.dart';
 import '../tide_forecast_screen.dart';
-//import '../swell_forecast_screen.dart';
 import '../fish_gallery_screen.dart';
 import '../safety/safety_equipment_screen.dart';
 import '../safety/pre_launch_screen.dart';
@@ -37,6 +38,8 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   late Future<Map<String, dynamic>> _weatherFuture;
+  late Box<VesselProfile> _vesselBox; // Added Vessel Box
+  
   double _currentSpeedKnots = 0.0;
   SpeedUnit _speedUnit = SpeedUnit.knots;
   TempUnit _tempUnit = TempUnit.celsius;
@@ -58,6 +61,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _selectedRamp = _saRamps[0];
+    // Initialize the Vessel Box from Hive
+    _vesselBox = Hive.box<VesselProfile>('vessel_profile');
     _weatherFuture = _fetchWeatherAndCheckMatches(); 
     _initSpeedometer();
     _loadVesselData();
@@ -143,6 +148,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final verdict = SafetyEngine.getVerdict(widget.isInshore, windSpeedNum, currentWarning);
         final Color statusColor = SafetyEngine.getStatusColor(verdict);
 
+        // Fetch the boat profile from Hive
+        final myBoat = _vesselBox.get('my_boat');
+
         return Scaffold(
           backgroundColor: const Color(0xFFF1F5F9),
           appBar: AppBar(
@@ -174,9 +182,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 // 1. SAFETY SUMMARY
                 _buildSafetySummaryCard(statusColor),
+                const SizedBox(height: 12),
+
+                // 2. VESSEL SAFETY STATUS (Based on length and wind)
+                _buildSafetyCard(myBoat, windSpeedNum.toInt()),
                 const SizedBox(height: 20),
 
-                // 2. LIVE BOAT DATA
                 _buildSectionLabel("LIVE BOAT DATA"),
                 Row(
                   children: [
@@ -201,33 +212,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(height: 25),
 
-                // 3. ENVIRONMENT
                 _buildSectionLabel("MARINE ENVIRONMENT"),
                 Row(
                   children: [
-                   _NavSmallTile(
-  label: "Wind",
-  value: "${windSpeedNum.toInt()}kts ${data['windDir']}",
-  icon: Icons.air,
-  color: Colors.blue,
-  onTap: () {
-    // SAFETY CHECK: Prevent Red Screen if API failed or is empty
-    if (data['forecasts'] == null || (data['forecasts'] as Map).isEmpty || data['forecasts']['wind'] == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Forecast data not available yet. Please refresh."))
-      );
-      return;
-    }
-    Navigator.push(
-      context, 
-      MaterialPageRoute(
-        builder: (c) => WindForecastScreen(forecastData: data['forecasts'])
-      )
-    );
-  },
-),
-
-
+                    _NavSmallTile(
+                      label: "Wind",
+                      value: "${windSpeedNum.toInt()}kts ${data['windDir']}",
+                      icon: Icons.air,
+                      color: Colors.blue,
+                      onTap: () {
+                        if (data['forecasts'] == null || (data['forecasts'] as Map).isEmpty || data['forecasts']['wind'] == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("Forecast data not available yet. Please refresh."))
+                          );
+                          return;
+                        }
+                        Navigator.push(context, MaterialPageRoute(builder: (c) => WindForecastScreen(forecastData: data['forecasts'])));
+                      },
+                    ),
                     const SizedBox(width: 10),
                     _NavSmallTile(
                       label: "Tides",
@@ -248,7 +250,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(height: 25),
 
-                // 4. FISHING LOGS & INTEL
                 _buildSectionLabel("FISHING LOGS & INTEL"),
                 Row(
                   children: [
@@ -284,7 +285,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                 const SizedBox(height: 25),
 
-                // 5. VESSEL & COMPLIANCE
                 _buildSectionLabel("VESSEL & COMPLIANCE"),
                 _NavWideTile(
                   label: "Vessel Maintenance Log",
@@ -320,6 +320,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Widget _buildSafetyCard(VesselProfile? vessel, int windKnots) {
+    bool isHighRisk = windKnots > 15; 
+    
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: (vessel?.length ?? 5.0) < 4.8 || isHighRisk ? Colors.orange.shade50 : Colors.green.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: (vessel?.length ?? 5.0) < 4.8 || isHighRisk ? Colors.orange : Colors.green),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.gpp_maybe, color: (vessel?.length ?? 5.0) < 4.8 || isHighRisk ? Colors.orange : Colors.green),
+          const SizedBox(width: 15),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text("SAFETY STATUS", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                Text(vessel?.lifejacketRequirement ?? "Set vessel length in settings", 
+                    style: const TextStyle(fontSize: 14)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSectionLabel(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -327,58 +356,56 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-    Widget _buildSafetySummaryCard(Color safetyEngineColor) {
-      if (_isDataLoading) return const LinearProgressIndicator();
+  Widget _buildSafetySummaryCard(Color safetyEngineColor) {
+    if (_isDataLoading) return const LinearProgressIndicator();
 
-      final expired = _safetyGear.where((i) => i.daysUntilExpiry < 0).length;
-      final warning = _safetyGear.where((i) => i.daysUntilExpiry >= 0 && i.daysUntilExpiry < 30).length;
-      
-      bool serviceOverdue = false;
-      if (_vesselLogs.isNotEmpty) {
-        final lastSvc = _vesselLogs.firstWhere((l) => l.isServiceRecord, orElse: () => _vesselLogs.last);
-        if (_vesselLogs.first.engineHours - lastSvc.engineHours >= 100) serviceOverdue = true;
-      }
-
-      Color finalColor = safetyEngineColor;
-      String title = "VESSEL READY";
-      
-      // FIXED: Using _selectedRamp here to clear the 'unused_field' warning
-      String subtitle = "Conditions at ${_selectedRamp.name}: Perfect";
-
-      if (expired > 0) {
-        finalColor = Colors.red.shade700;
-        title = "ACTION REQUIRED";
-        subtitle = "$expired ITEMS EXPIRED";
-      } else if (warning > 0 || serviceOverdue) {
-        finalColor = Colors.orange.shade700;
-        title = "MAINTENANCE DUE";
-        subtitle = serviceOverdue ? "Service Overdue (100h)" : "Safety gear expiring soon";
-      }
-
-      return Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: finalColor,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: finalColor.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 4))],
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.check_circle, color: Colors.white, size: 40),
-            const SizedBox(width: 15),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                  Text(subtitle, style: const TextStyle(color: Colors.white70)),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
+    final expired = _safetyGear.where((i) => i.daysUntilExpiry < 0).length;
+    final warning = _safetyGear.where((i) => i.daysUntilExpiry >= 0 && i.daysUntilExpiry < 30).length;
+    
+    bool serviceOverdue = false;
+    if (_vesselLogs.isNotEmpty) {
+      final lastSvc = _vesselLogs.firstWhere((l) => l.isServiceRecord, orElse: () => _vesselLogs.last);
+      if (_vesselLogs.first.engineHours - lastSvc.engineHours >= 100) serviceOverdue = true;
     }
+
+    Color finalColor = safetyEngineColor;
+    String title = "VESSEL READY";
+    String subtitle = "Conditions at ${_selectedRamp.name}: Perfect";
+
+    if (expired > 0) {
+      finalColor = Colors.red.shade700;
+      title = "ACTION REQUIRED";
+      subtitle = "$expired ITEMS EXPIRED";
+    } else if (warning > 0 || serviceOverdue) {
+      finalColor = Colors.orange.shade700;
+      title = "MAINTENANCE DUE";
+      subtitle = serviceOverdue ? "Service Overdue (100h)" : "Safety gear expiring soon";
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: finalColor,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: finalColor.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.check_circle, color: Colors.white, size: 40),
+          const SizedBox(width: 15),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                Text(subtitle, style: const TextStyle(color: Colors.white70)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   String _formatSpeed(double s) => _speedUnit == SpeedUnit.kmh 
       ? "${(s * 1.852).toStringAsFixed(1)} km/h" 
@@ -388,8 +415,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ? "${((t * 9/5) + 32).toStringAsFixed(0)}°F" 
       : "${t.toStringAsFixed(0)}°C";
 }
-
-// --- HELPER CLASSES ---
+// ... rest of your helper classes remain the same
 
 class _NavSmallTile extends StatelessWidget {
   final String label, value; final IconData icon; final Color color; final VoidCallback onTap;
