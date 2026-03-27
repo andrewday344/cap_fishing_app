@@ -1,3 +1,4 @@
+import '../vessel/vessel_settings_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:hive_flutter/hive_flutter.dart'; // Added for Box usage
@@ -170,6 +171,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   PopupMenuItem(
                     child: Text("Temp: ${_tempUnit.name.toUpperCase()}"),
                     onTap: () => setState(() => _tempUnit = _tempUnit == TempUnit.celsius ? TempUnit.fahrenheit : TempUnit.celsius),
+                  ),
+                 PopupMenuItem(
+                    child: const Text("Vessel Settings"),
+                    onTap: () {
+                      // We use Future.delayed to let the popup menu close properly first
+                      Future.delayed(Duration.zero, () {
+                        // THE FIX: Check if the screen is still active before navigating
+                        if (context.mounted) {
+                          Navigator.push(
+                            context, 
+                            MaterialPageRoute(builder: (c) => const VesselSettingsScreen()),
+                          ).then((_) {
+                            // Refresh the dashboard when you return to show the new boat stats
+                            if (mounted) setState(() {});
+                          });
+                        }
+                      });
+                    },
                   ),
                 ],
               ),
