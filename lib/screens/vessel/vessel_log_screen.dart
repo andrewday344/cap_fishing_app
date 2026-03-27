@@ -46,7 +46,7 @@ class _VesselLogScreenState extends State<VesselLogScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showAddLogDialog(),
-        label: const Text("ADD LOG", style: TextStyle(color: Colors.white, fontSize: 36)),
+        label: const Text("ADD LOG", style: TextStyle(color: Colors.white, fontSize: 20)),
         icon: const Icon(Icons.add),
         backgroundColor: const Color(0xFF004E92),
       ),
