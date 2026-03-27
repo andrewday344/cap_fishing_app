@@ -153,7 +153,6 @@ class _WindForecastScreenState extends State<WindForecastScreen> {
 }
 
 // --- WillyStyleInteractivePainter and _drawArrow remain unchanged ---
-
 class WillyStyleInteractivePainter extends CustomPainter {
   final List<dynamic> entries;
   final int? hoverIndex;
@@ -167,7 +166,7 @@ class WillyStyleInteractivePainter extends CustomPainter {
 
     final double stepX = size.width / (entries.length - 1);
     const double maxWind = 40.0;
-    const double graphTopPadding = 40.0; // Space for dates
+    const double graphTopPadding = 40.0; 
 
     // 1. DRAW DAY/NIGHT BACKGROUNDS
     for (int i = 0; i < entries.length - 1; i++) {
@@ -178,11 +177,9 @@ class WillyStyleInteractivePainter extends CustomPainter {
       canvas.drawRect(rect, Paint()..color = isNight ? const Color(0xFFF1F5F9) : Colors.white);
     }
 
-    // 2. DRAW DATE LABELS AT THE TOP
+    // 2. DRAW DATE LABELS & VERTICAL LINES
     for (var boundary in dayBoundaries) {
       double x = boundary['startIndex'] * stepX;
-      
-      // Draw a subtle vertical line to separate days
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), Paint()..color = Colors.black12);
 
       TextPainter(
@@ -194,18 +191,18 @@ class WillyStyleInteractivePainter extends CustomPainter {
       )..layout()..paint(canvas, Offset(x + 5, 10));
     }
 
-    // 3. DRAW WIND LINE & ARROWS
+    // 3. DRAW WIND LINE & ARROWS (Larger Size)
     final path = Path();
     for (int i = 0; i < entries.length; i++) {
       double wind = (entries[i]['speed'] / 1.852);
       double x = i * stepX;
-      // Scale y to stay within the graph area (below the date labels)
       double y = size.height - (wind / maxWind * (size.height - graphTopPadding));
 
       if (i == 0) { 
         path.moveTo(x, y);
-      } else { path.lineTo(x, y);
-     }
+      } else { 
+        path.lineTo(x, y);
+      }
 
       if (entries.length < 50 || i % 2 == 0) {
         _drawArrow(canvas, x, y, entries[i]['directionText'], wind);
@@ -220,7 +217,9 @@ class WillyStyleInteractivePainter extends CustomPainter {
           Paint()..color = Colors.blue.withValues(alpha: 0.5)..strokeWidth = 1);
     }
   }
-void _drawArrow(Canvas canvas, double x, double y, String dir, double speed) {
+
+  // --- ARROW LOGIC (Resized 50% larger) ---
+  void _drawArrow(Canvas canvas, double x, double y, String dir, double speed) {
     Color arrowColor = speed < 10 ? Colors.green : (speed < 18 ? Colors.lightBlue : Colors.orange);
     Map<String, double> directions = {'N': 0, 'NE': 45, 'E': 90, 'SE': 135, 'S': 180, 'SW': 225, 'W': 270, 'NW': 315};
     double angle = (directions[dir.toUpperCase().substring(0, math.min(dir.length, 2))] ?? 0) * (math.pi / 180);
@@ -229,11 +228,7 @@ void _drawArrow(Canvas canvas, double x, double y, String dir, double speed) {
     canvas.translate(x, y);
     canvas.rotate(angle);
     
-    // Coordinates multiplied by 1.5 for a 50% size increase:
-    // Original (0, -6) -> (0, -9)
-    // Original (3, 3)  -> (4.5, 4.5)
-    // Original (0, 1)  -> (0, 1.5)
-    // Original (-3, 3) -> (-4.5, 4.5)
+    // Scale is 1.5x original
     canvas.drawPath(
       Path()
         ..moveTo(0, -9)
@@ -243,7 +238,9 @@ void _drawArrow(Canvas canvas, double x, double y, String dir, double speed) {
         ..close(), 
       Paint()..color = arrowColor
     );
-    
     canvas.restore();
   }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
