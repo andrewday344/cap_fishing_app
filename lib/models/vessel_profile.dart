@@ -1,9 +1,9 @@
 import 'package:hive/hive.dart';
 
-// This MUST match the filename exactly
-part 'vessel_profile.g.dart';
+// 1. MUST match the filename exactly
+part 'vessel_profile.g.dart'; 
 
-@HiveType(typeId: 3)
+@HiveType(typeId: 3) // 2. Make sure typeId 3 isn't used elsewhere
 class VesselProfile extends HiveObject {
   @HiveField(0)
   final String name;
@@ -15,15 +15,12 @@ class VesselProfile extends HiveObject {
   final bool isPowered;
 
   VesselProfile({
-    required this.name,
-    required this.length,
-    this.isPowered = true,
+    required this.name, 
+    required this.length, 
+    this.isPowered = true
   });
 
-  String get lifejacketRequirement {
-    if (length < 4.8) {
-      return "MANDATORY: Lifejackets must be worn at all times (Vessel <4.8m).";
-    }
-    return "REQUIRED: During heightened risk (Vessel >4.8m).";
-  }
+  String get lifejacketRequirement => length < 4.8 
+      ? "MANDATORY: Wear at all times." 
+      : "REQUIRED: During heightened risk.";
 }
