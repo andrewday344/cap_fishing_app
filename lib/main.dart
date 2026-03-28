@@ -6,16 +6,16 @@ import 'package:c_a_p/models/vessel_profile.dart'; // Import the model
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // 1. Initialize Hive (via your service)
+  await Hive.initFlutter(); // Ensure Hive is ready
+  
+  // 1. Initialize your custom database service
   await DatabaseService.instance.init();
 
-  // 2. Register the new Vessel Adapter
-  // This is the "Step 3" that links your generated g.dart file to the database
-  Hive.registerAdapter(VesselProfileAdapter());
-
-  // 3. Open the Vessel Box
-  await Hive.openBox<VesselProfile>('vessel_profile');
+  // 2. Register and OPEN the vessel box before running the app
+  if (!Hive.isAdapterRegistered(3)) {
+    Hive.registerAdapter(VesselProfileAdapter());
+  }
+  await Hive.openBox<VesselProfile>('vessel_profile'); 
 
   runApp(const SeacliffApp());
 }
