@@ -20,19 +20,34 @@ class VesselProfileAdapter extends TypeAdapter<VesselProfile> {
       name: fields[0] as String,
       length: fields[1] as double,
       isPowered: fields[2] as bool,
+      registration: fields[3] as String,
+      engineHp: fields[4] as int,
+      windIncreaseThreshold: fields[5] as double,
+      swellIncreaseThreshold: fields[6] as double,
+      notificationsEnabled: fields[7] as bool,
     );
   }
 
   @override
   void write(BinaryWriter writer, VesselProfile obj) {
     writer
-      ..writeByte(3)
+      ..writeByte(8)
       ..writeByte(0)
       ..write(obj.name)
       ..writeByte(1)
       ..write(obj.length)
       ..writeByte(2)
-      ..write(obj.isPowered);
+      ..write(obj.isPowered)
+      ..writeByte(3)
+      ..write(obj.registration)
+      ..writeByte(4)
+      ..write(obj.engineHp)
+      ..writeByte(5)
+      ..write(obj.windIncreaseThreshold)
+      ..writeByte(6)
+      ..write(obj.swellIncreaseThreshold)
+      ..writeByte(7)
+      ..write(obj.notificationsEnabled);
   }
 
   @override

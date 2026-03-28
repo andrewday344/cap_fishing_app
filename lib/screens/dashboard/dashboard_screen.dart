@@ -1,14 +1,15 @@
+import 'dart:math' as math; 
 import '../vessel/vessel_settings_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:hive_flutter/hive_flutter.dart'; // Added for Box usage
+import 'package:hive_flutter/hive_flutter.dart'; 
 import '../../core/safety_engine.dart';
 import '../../core/notification_engine.dart'; 
 import '../../services/willy_weather_service.dart';
 import '../../services/database_service.dart';
 import '../../models/safety_item_model.dart';
 import '../../models/vessel_log_model.dart';
-import '../../models/vessel_profile.dart'; // Ensure this matches your filename
+import '../../models/vessel_profile.dart'; 
 import '../logbook/logbook_screen.dart';
 import '../catch_log/catch_log_screen.dart';
 import '../wind_forecast_screen.dart';
@@ -18,7 +19,6 @@ import '../safety/safety_equipment_screen.dart';
 import '../safety/pre_launch_screen.dart';
 import '../vessel/vessel_log_screen.dart';
 
-// --- MODELS & ENUMS ---
 enum SpeedUnit { knots, kmh }
 enum TempUnit { celsius, fahrenheit }
 
@@ -39,7 +39,7 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   late Future<Map<String, dynamic>> _weatherFuture;
-  late Box<VesselProfile> _vesselBox; // Added Vessel Box
+  late Box<VesselProfile> _vesselBox; 
   
   double _currentSpeedKnots = 0.0;
   SpeedUnit _speedUnit = SpeedUnit.knots;
@@ -62,11 +62,86 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _selectedRamp = _saRamps[0];
-    // Initialize the Vessel Box from Hive
     _vesselBox = Hive.box<VesselProfile>('vessel_profile');
     _weatherFuture = _fetchWeatherAndCheckMatches(); 
     _initSpeedometer();
     _loadVesselData();
+  }
+
+  // --- SAFETY LOGIC ---
+  List<String> _getSafetyWarnings(VesselProfile vessel, Map<String, dynamic>? forecasts) {
+    List<String> warnings = [];
+    if (forecasts == null || forecasts['wind'] == null) return warnings;
+
+    final windForecast = forecasts['wind'] as List<dynamic>;
+    final swellForecast = forecasts['swell'] as List<dynamic>?;
+    
+    if (windForecast.isEmpty) return warnings;
+
+    final nowWind = (windForecast.first['speed'] ?? 0) / 1.852;
+    final double nowSwell = (swellForecast != null && swellForecast.isNotEmpty) 
+        ? (swellForecast.first['height'] ?? 0.0) : 0.0;
+
+    for (int i = 1; i < math.min(windForecast.length, 7); i++) {
+      final futureWind = (windForecast[i]['speed'] ?? 0) / 1.852;
+      
+      double windPct = ((futureWind - nowWind) / nowWind) * 100;
+      if (windPct >= vessel.windIncreaseThreshold && nowWind > 5) {
+        warnings.add("Wind increasing ${windPct.toStringAsFixed(0)}% in ${i}h.");
+        break;
+      }
+
+      if (swellForecast != null && swellForecast.length > i) {
+        double futureSwell = swellForecast[i]['height'] ?? 0.0;
+        double swellDiff = futureSwell - nowSwell;
+        if (swellDiff >= vessel.swellIncreaseThreshold) {
+          warnings.add("Swell rising ${swellDiff.toStringAsFixed(1)}m in ${i}h.");
+          break;
+        }
+      }
+    }
+
+    if (vessel.notificationsEnabled) {
+      final hour = DateTime.now().hour;
+      if (hour >= 17 || hour <= 5) {
+        warnings.add("Low light conditions. Night launch not recommended.");
+      }
+    }
+
+    return warnings;
+  }
+
+  Widget _buildSafetyAlerts(VesselProfile vessel, Map<String, dynamic>? forecasts) {
+    final warnings = _getSafetyWarnings(vessel, forecasts);
+    if (warnings.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.orange.withAlpha(25), // Compatible color syntax
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.orange.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.notification_important, color: Colors.orange.shade900),
+              const SizedBox(width: 8),
+              Text("SAFETY ALERT: ${vessel.name.toUpperCase()}", 
+                   style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange.shade900)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ...warnings.map((w) => Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Text("• $w", style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+          )),
+        ],
+      ),
+    );
   }
 
   Future<void> _loadVesselData() async {
@@ -132,11 +207,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       future: _weatherFuture,
       builder: (context, weatherSnapshot) {
         Map<String, dynamic> data = {
-          'windKnots': 0,
-          'windDir': '--',
-          'temp': 0,
-          'warning': 'NIL',
-          'forecasts': null,
+          'windKnots': 0, 'windDir': '--', 'temp': 0, 'warning': 'NIL', 'forecasts': null,
         };
 
         if (weatherSnapshot.hasData) {
@@ -149,15 +220,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final verdict = SafetyEngine.getVerdict(widget.isInshore, windSpeedNum, currentWarning);
         final Color statusColor = SafetyEngine.getStatusColor(verdict);
 
-        // Fetch the boat profile from Hive
-        final myBoat = _vesselBox.get('my_boat');
+        final myBoat = _vesselBox.isNotEmpty ? _vesselBox.getAt(0) : null;
 
         return Scaffold(
           backgroundColor: const Color(0xFFF1F5F9),
           appBar: AppBar(
             backgroundColor: Colors.white,
             elevation: 0,
-            title: const Text("Conditions are perfect", style: TextStyle(fontWeight: FontWeight.w900)),
+            title: const Text("Seacliff Fishing", style: TextStyle(fontWeight: FontWeight.w900)),
             centerTitle: true,
             leading: IconButton(icon: const Icon(Icons.refresh, size: 28), onPressed: _handleRefresh),
             actions: [
@@ -172,18 +242,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     child: Text("Temp: ${_tempUnit.name.toUpperCase()}"),
                     onTap: () => setState(() => _tempUnit = _tempUnit == TempUnit.fahrenheit ? TempUnit.celsius : TempUnit.fahrenheit),
                   ),
-                 PopupMenuItem(
-                    child: const Text("Vessel Settings"),
+                  PopupMenuItem(
+                    child: const Text("Fleet & Vessel Settings"),
                     onTap: () {
-                      // We use Future.delayed to let the popup menu close properly first
                       Future.delayed(Duration.zero, () {
-                        // THE FIX: Check if the screen is still active before navigating
                         if (context.mounted) {
                           Navigator.push(
                             context, 
                             MaterialPageRoute(builder: (c) => const VesselSettingsScreen()),
                           ).then((_) {
-                            // Refresh the dashboard when you return to show the new boat stats
                             if (mounted) setState(() {});
                           });
                         }
@@ -199,14 +266,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 1. SAFETY SUMMARY
+                if (myBoat != null) _buildSafetyAlerts(myBoat, data['forecasts']),
                 _buildSafetySummaryCard(statusColor),
                 const SizedBox(height: 12),
-
-                // 2. VESSEL SAFETY STATUS (Based on length and wind)
                 _buildSafetyCard(myBoat, windSpeedNum.toInt()),
                 const SizedBox(height: 20),
-
                 _buildSectionLabel("LIVE BOAT DATA"),
                 Row(
                   children: [
@@ -221,8 +285,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: _BriefHeaderCard(
-                        label: "Total Hours",
-                        value: "${(_vesselLogs.isEmpty ? 0.0 : _vesselLogs.first.engineHours).toStringAsFixed(1)} h",
+                        label: "Engine Hours",
+                        value: "${(_vesselLogs.isEmpty ? 0.0 : _vesselLogs.first.engineHours).toStringAsFixed(1)}h",
                         icon: Icons.timer_outlined,
                         color: Colors.blueGrey,
                       ),
@@ -230,64 +294,51 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ],
                 ),
                 const SizedBox(height: 25),
-
                 _buildSectionLabel("MARINE ENVIRONMENT"),
                 Row(
                   children: [
                     _NavSmallTile(
                       label: "Wind",
                       value: "${windSpeedNum.toInt()}kts ${data['windDir']}",
-                      icon: Icons.air,
-                      color: Colors.blue,
+                      icon: Icons.air, color: Colors.blue,
                       onTap: () {
-                        if (data['forecasts'] == null || (data['forecasts'] as Map).isEmpty || data['forecasts']['wind'] == null) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text("Forecast data not available yet. Please refresh."))
-                          );
-                          return;
+                        if (data['forecasts'] != null) {
+                           Navigator.push(context, MaterialPageRoute(builder: (c) => WindForecastScreen(forecastData: data['forecasts'])));
                         }
-                        Navigator.push(context, MaterialPageRoute(builder: (c) => WindForecastScreen(forecastData: data['forecasts'])));
                       },
                     ),
                     const SizedBox(width: 10),
                     _NavSmallTile(
                       label: "Tides",
                       value: data['nextTide'] ?? "View",
-                      icon: Icons.tsunami,
-                      color: Colors.cyan,
+                      icon: Icons.tsunami, color: Colors.cyan,
                       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => TideForecastScreen(forecastData: data['forecasts']))),
                     ),
                     const SizedBox(width: 10),
                     _NavSmallTile(
                       label: "Temp",
                       value: _formatTemp((data['temp'] as num).toDouble()),
-                      icon: Icons.thermostat,
-                      color: Colors.deepOrange,
+                      icon: Icons.thermostat, color: Colors.deepOrange,
                       onTap: () {},
                     ),
                   ],
                 ),
                 const SizedBox(height: 25),
-
                 _buildSectionLabel("FISHING LOGS & INTEL"),
                 Row(
                   children: [
                     Expanded(
                       child: _NavLargeTile(
-                        label: "New Catch",
-                        subText: "Private Log",
-                        icon: Icons.add_box_rounded,
-                        color: Colors.green.shade700,
+                        label: "New Catch", subText: "Private Log",
+                        icon: Icons.add_box_rounded, color: Colors.green.shade700,
                         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => CatchLogScreen(currentWeatherData: data))),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: _NavLargeTile(
-                        label: "Logbook",
-                        subText: "Intel & History",
-                        icon: Icons.menu_book_rounded,
-                        color: Colors.orange.shade800,
+                        label: "Logbook", subText: "Intel & History",
+                        icon: Icons.menu_book_rounded, color: Colors.orange.shade800,
                         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const LogbookScreen())),
                       ),
                     ),
@@ -295,35 +346,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(height: 12),
                 _NavWideTile(
-                  label: "Fish Species Gallery",
-                  subText: "SA Size & Bag Limits",
-                  icon: Icons.set_meal_rounded,
-                  color: Colors.teal,
+                  label: "Fish Species Gallery", subText: "SA Size & Bag Limits",
+                  icon: Icons.set_meal_rounded, color: Colors.teal,
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const FishGalleryScreen())),
                 ),
-
                 const SizedBox(height: 25),
-
                 _buildSectionLabel("VESSEL & COMPLIANCE"),
                 _NavWideTile(
-                  label: "Vessel Maintenance Log",
-                  subText: "Track Engine Hours & Fuel",
-                  icon: Icons.handyman_rounded,
-                  color: Colors.blueGrey,
+                  label: "Maintenance Log", subText: "Service: ${myBoat?.engineHp ?? 0}HP Engine",
+                  icon: Icons.handyman_rounded, color: Colors.blueGrey,
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const VesselLogScreen())).then((_) => _loadVesselData()),
                 ),
                 _NavWideTile(
-                  label: "Safety Equipment Gallery",
-                  subText: "Track Flare & EPIRB Expiries",
-                  icon: Icons.shield_rounded,
-                  color: const Color(0xFF004E92),
+                  label: "Safety Equipment", subText: "Rego: ${myBoat?.registration ?? '---'}",
+                  icon: Icons.shield_rounded, color: const Color(0xFF004E92),
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const SafetyEquipmentScreen())).then((_) => _loadVesselData()),
                 ),
                 _NavWideTile(
-                  label: "Pre-Launch Checklist",
-                  subText: "Go/No-Go + Wind Bar",
-                  icon: Icons.checklist_rtl_rounded,
-                  color: Colors.deepPurple,
+                  label: "Pre-Launch Checklist", subText: "Go/No-Go Safety Check",
+                  icon: Icons.checklist_rtl_rounded, color: Colors.deepPurple,
                   onTap: () async {
                     final weather = await _weatherFuture;
                     if (context.mounted) {
@@ -341,7 +382,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildSafetyCard(VesselProfile? vessel, int windKnots) {
     bool isHighRisk = windKnots > 15; 
-    
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
@@ -357,9 +397,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text("SAFETY STATUS", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                Text(vessel?.lifejacketRequirement ?? "Set vessel length in settings", 
-                    style: const TextStyle(fontSize: 14)),
+                Text("${vessel?.name ?? 'VESSEL'} STATUS", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                Text(vessel?.lifejacketRequirement ?? "Add vessel in settings", 
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
               ],
             ),
           ),
@@ -398,7 +438,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     } else if (warning > 0 || serviceOverdue) {
       finalColor = Colors.orange.shade700;
       title = "MAINTENANCE DUE";
-      subtitle = serviceOverdue ? "Service Overdue (100h)" : "Safety gear expiring soon";
+      subtitle = serviceOverdue ? "Service Overdue (100h)" : "Gear expiring soon";
     }
 
     return Container(
@@ -406,7 +446,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       decoration: BoxDecoration(
         color: finalColor,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: finalColor.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 4))],
+        boxShadow: [BoxShadow(color: finalColor.withAlpha(75), blurRadius: 10, offset: const Offset(0, 4))],
       ),
       child: Row(
         children: [
@@ -434,7 +474,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ? "${((t * 9/5) + 32).toStringAsFixed(0)}°F" 
       : "${t.toStringAsFixed(0)}°C";
 }
-// ... rest of your helper classes remain the same
+
+// --- HELPER CLASSES (The "Blueprints" for your tiles) ---
 
 class _NavSmallTile extends StatelessWidget {
   final String label, value; final IconData icon; final Color color; final VoidCallback onTap;
