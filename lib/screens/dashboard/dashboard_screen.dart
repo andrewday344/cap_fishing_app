@@ -119,7 +119,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.orange.withAlpha(25), // Compatible color syntax
+        color: Colors.orange.withAlpha(25),
         borderRadius: BorderRadius.circular(15),
         border: Border.all(color: Colors.orange.shade300),
       ),
@@ -131,7 +131,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Icon(Icons.notification_important, color: Colors.orange.shade900),
               const SizedBox(width: 8),
               Text("SAFETY ALERT: ${vessel.name.toUpperCase()}", 
-                   style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange.shade900)),
+                   style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF5D4037))),
             ],
           ),
           const SizedBox(height: 8),
@@ -206,13 +206,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return FutureBuilder<Map<String, dynamic>>(
       future: _weatherFuture,
       builder: (context, weatherSnapshot) {
-        Map<String, dynamic> data = {
+        
+        // --- STEP 2: FIX THE WHITE SCREEN ---
+        if (weatherSnapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            backgroundColor: Color(0xFFF1F5F9),
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(color: Color(0xFF004E92)),
+                  SizedBox(height: 15),
+                  Text("Fetching Seacliff Forecast...", style: TextStyle(color: Colors.blueGrey)),
+                ],
+              ),
+            ),
+          );
+        }
+
+        if (weatherSnapshot.hasError) {
+          return Scaffold(
+            body: Center(
+              child: Text("Weather Connection Error: ${weatherSnapshot.error}"),
+            ),
+          );
+        }
+        // ------------------------------------
+
+        Map<String, dynamic> data = weatherSnapshot.data ?? {
           'windKnots': 0, 'windDir': '--', 'temp': 0, 'warning': 'NIL', 'forecasts': null,
         };
-
-        if (weatherSnapshot.hasData) {
-          data = weatherSnapshot.data!;
-        }
 
         final double windSpeedNum = (data['windKnots'] is num) ? data['windKnots'].toDouble() : 0.0;
         final String currentWarning = data['warning'] ?? 'NIL';
@@ -317,7 +340,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     const SizedBox(width: 10),
                     _NavSmallTile(
                       label: "Temp",
-                      value: _formatTemp((data['temp'] as num).toDouble()),
+                      value: _formatTemp(((data['temp'] ?? 0) as num).toDouble()),
                       icon: Icons.thermostat, color: Colors.deepOrange,
                       onTap: () {},
                     ),
@@ -475,7 +498,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       : "${t.toStringAsFixed(0)}°C";
 }
 
-// --- HELPER CLASSES (The "Blueprints" for your tiles) ---
+// --- HELPER CLASSES ---
 
 class _NavSmallTile extends StatelessWidget {
   final String label, value; final IconData icon; final Color color; final VoidCallback onTap;
