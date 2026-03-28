@@ -21,6 +21,6 @@ class VesselProfile extends HiveObject {
   });
 
   String get lifejacketRequirement => length < 4.8 
-      ? "MANDATORY: Wear at all times." 
+      ? "MANDATORY: Wear lifejacket at all times." 
       : "REQUIRED: During heightened risk.";
 }
