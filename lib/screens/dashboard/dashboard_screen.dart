@@ -360,7 +360,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: _NavLargeTile(
-                        label: "Logbook", subText: "Intel & History",
+                        label: "Logbook", subText: "Intel & Catch History",
                         icon: Icons.menu_book_rounded, color: Colors.orange.shade800,
                         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const LogbookScreen())),
                       ),
