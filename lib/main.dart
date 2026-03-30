@@ -1,33 +1,44 @@
 import 'package:flutter/material.dart';
-import 'package:hive_flutter/hive_flutter.dart'; // Ensure Hive is imported here
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:c_a_p/screens/dashboard/dashboard_screen.dart'; 
 import 'package:c_a_p/services/database_service.dart';
-import 'package:c_a_p/models/vessel_profile.dart'; // Import the model
-
+import 'package:c_a_p/models/vessel_profile.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
+  String debugStatus = "Starting...";
+  
   try {
+    debugStatus = "Initializing Hive...";
     await Hive.initFlutter();
     
-    // Register Adapter only if it hasn't been yet
+    debugStatus = "Registering Adapters...";
     if (!Hive.isAdapterRegistered(3)) {
       Hive.registerAdapter(VesselProfileAdapter());
     }
     
-    // Open the box
+    debugStatus = "Opening Vessel Box...";
     await Hive.openBox<VesselProfile>('vessel_profile');
     
-    // Initialize DB Service
+    debugStatus = "Initializing Database Service...";
     await DatabaseService.instance.init();
     
+    runApp(const SeacliffApp());
   } catch (e) {
-    // If Hive fails on web, we print the error but still start the app
-    debugPrint("Startup Error: $e");
+    // IF THE APP CRASHES, SHOW THE ERROR ON SCREEN INSTEAD OF A WHITE PAGE
+    runApp(MaterialApp(
+      home: Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Text("FATAL ERROR at $debugStatus\n\n$e", 
+                 style: const TextStyle(color: Colors.red, fontSize: 12)),
+          ),
+        ),
+      ),
+    ));
   }
-
-  runApp(const SeacliffApp());
 }
 
 class SeacliffApp extends StatelessWidget {
