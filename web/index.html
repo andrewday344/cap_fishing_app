@@ -33,13 +33,17 @@
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
- <script>
+  <div id="loading-msg" style="display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif; color: #555;">
+    ⚓ Seacliff App Loading...
+  </div>
+
+  <script>
     window._flutter = {
       config: {
-        renderer: "html",
+        renderer: "canvaskit", // Force the stable mobile renderer
       },
     };
   </script>
-  <script src="flutter_bootstrap.js" async></script> 
+  <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

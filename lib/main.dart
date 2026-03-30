@@ -4,18 +4,28 @@ import 'package:c_a_p/screens/dashboard/dashboard_screen.dart';
 import 'package:c_a_p/services/database_service.dart';
 import 'package:c_a_p/models/vessel_profile.dart'; // Import the model
 
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Hive.initFlutter(); // Ensure Hive is ready
   
-  // 1. Initialize your custom database service
-  await DatabaseService.instance.init();
-
-  // 2. Register and OPEN the vessel box before running the app
-  if (!Hive.isAdapterRegistered(3)) {
-    Hive.registerAdapter(VesselProfileAdapter());
+  try {
+    await Hive.initFlutter();
+    
+    // Register Adapter only if it hasn't been yet
+    if (!Hive.isAdapterRegistered(3)) {
+      Hive.registerAdapter(VesselProfileAdapter());
+    }
+    
+    // Open the box
+    await Hive.openBox<VesselProfile>('vessel_profile');
+    
+    // Initialize DB Service
+    await DatabaseService.instance.init();
+    
+  } catch (e) {
+    // If Hive fails on web, we print the error but still start the app
+    debugPrint("Startup Error: $e");
   }
-  await Hive.openBox<VesselProfile>('vessel_profile'); 
 
   runApp(const SeacliffApp());
 }
