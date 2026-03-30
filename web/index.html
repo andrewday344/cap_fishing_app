@@ -14,7 +14,8 @@
     This is a placeholder for base href that will be replaced by the value of
     the `--base-href` argument provided to `flutter build`.
   -->
-  <base href="./">
+  
+  <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
@@ -33,17 +34,16 @@
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
-  <div id="loading-msg" style="display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif; color: #555;">
-    ⚓ Seacliff App Loading...
+  <div id="loading-indicator" style="display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif; background-color: #F1F5F9;">
+    <h2 style="color: #004E92; margin-bottom: 10px;">⚓ Seacliff Fishing App</h2>
+    <p style="color: #64748B;">Initializing Marine Engine... Please wait.</p>
+    <div style="width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #004E92; border-radius: 50%; animation: spin 1s linear infinite;"></div>
   </div>
 
-  <script>
-    window._flutter = {
-      config: {
-        renderer: "canvaskit", // Force the stable mobile renderer
-      },
-    };
-  </script>
+  <style>
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  </style>
+
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

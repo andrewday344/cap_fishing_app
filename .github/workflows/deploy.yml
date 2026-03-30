@@ -20,3 +20,6 @@ jobs:
         with:
           path: build/web
       - uses: actions/deploy-pages@v4
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
