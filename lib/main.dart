@@ -17,7 +17,16 @@ void main() async {
     if (!Hive.isAdapterRegistered(3)) {
       Hive.registerAdapter(VesselProfileAdapter());
     }
-    
+    debugStatus = "Opening Vessel Box...";
+    try {
+      // Try to open it normally
+      await Hive.openBox<VesselProfile>('vessel_profile');
+    } catch (e) {
+      // If it fails (likely due to the null/String error), wipe it and start fresh
+      debugPrint("Box corrupted or schema mismatch. Resetting... $e");
+      await Hive.deleteBoxFromDisk('vessel_profile'); 
+      await Hive.openBox<VesselProfile>('vessel_profile');
+    }
     debugStatus = "Opening Vessel Box...";
     await Hive.openBox<VesselProfile>('vessel_profile');
     

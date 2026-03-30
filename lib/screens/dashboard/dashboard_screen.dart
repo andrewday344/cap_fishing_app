@@ -86,7 +86,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final futureWind = (windForecast[i]['speed'] ?? 0) / 1.852;
       
       double windPct = ((futureWind - nowWind) / nowWind) * 100;
-      if (windPct >= vessel.windIncreaseThreshold && nowWind > 5) {
+      
+      // FIX 1: Provide a default of 30.0 if windIncreaseThreshold is null
+      if (windPct >= (vessel.windIncreaseThreshold ?? 30.0) && nowWind > 5) {
         warnings.add("Wind increasing ${windPct.toStringAsFixed(0)}% in ${i}h.");
         break;
       }
@@ -94,14 +96,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (swellForecast != null && swellForecast.length > i) {
         double futureSwell = swellForecast[i]['height'] ?? 0.0;
         double swellDiff = futureSwell - nowSwell;
-        if (swellDiff >= vessel.swellIncreaseThreshold) {
+        
+        // FIX 2: Provide a default of 0.5 if swellIncreaseThreshold is null
+        if (swellDiff >= (vessel.swellIncreaseThreshold ?? 0.5)) {
           warnings.add("Swell rising ${swellDiff.toStringAsFixed(1)}m in ${i}h.");
           break;
         }
       }
     }
 
-    if (vessel.notificationsEnabled) {
+    // FIX 3: Check if notificationsEnabled is null, default to true
+    if (vessel.notificationsEnabled ?? true) {
       final hour = DateTime.now().hour;
       if (hour >= 17 || hour <= 5) {
         warnings.add("Low light conditions. Night launch not recommended.");
