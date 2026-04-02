@@ -503,7 +503,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     } else if (warning > 0 || serviceOverdue) {
       finalColor = Colors.orange.shade700;
       title = "MAINTENANCE DUE";
-      subtitle = serviceOverdue ? "Service Overdue (100h)" : "Gear expiring soon";
+      subtitle = serviceOverdue ? "Service Overdue (100hrs)" : "Gear expiring soon";
     }
 
     return Container(

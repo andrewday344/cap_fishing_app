@@ -20,11 +20,11 @@ class VesselProfileAdapter extends TypeAdapter<VesselProfile> {
       name: fields[0] as String,
       length: fields[1] as double,
       isPowered: fields[2] as bool,
-      registration: fields[3] as String,
-      engineHp: fields[4] as int,
-      windIncreaseThreshold: fields[5] as double,
-      swellIncreaseThreshold: fields[6] as double,
-      notificationsEnabled: fields[7] as bool,
+      registration: fields[3] as String?,
+      engineHp: fields[4] as int?,
+      windIncreaseThreshold: fields[5] as double?,
+      swellIncreaseThreshold: fields[6] as double?,
+      notificationsEnabled: fields[7] as bool?,
     );
   }
 
