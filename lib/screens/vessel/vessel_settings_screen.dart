@@ -39,11 +39,23 @@ class _VesselSettingsScreenState extends State<VesselSettingsScreen> {
       notificationsEnabled: _notificationsEnabled,
     );
 
+    // Save to Hive
     if (index != null) {
       _vesselBox.putAt(index, newVessel);
     } else {
       _vesselBox.add(newVessel);
     }
+
+    // FEEDBACK & AUTO-RETURN
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Vessel Added to Fleet"))
+    );
+
+    // THE FIX: Wait a tiny bit for Hive to finish writing, then go back
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) Navigator.pop(context); 
+    });
+  
 
     _clearForm();
     setState(() {});

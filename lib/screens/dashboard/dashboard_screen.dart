@@ -87,7 +87,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       
       double windPct = ((futureWind - nowWind) / nowWind) * 100;
       
-      // FIX 1: Provide a default of 30.0 if windIncreaseThreshold is null
       if (windPct >= (vessel.windIncreaseThreshold ?? 30.0) && nowWind > 5) {
         warnings.add("Wind increasing ${windPct.toStringAsFixed(0)}% in ${i}h.");
         break;
@@ -97,7 +96,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         double futureSwell = swellForecast[i]['height'] ?? 0.0;
         double swellDiff = futureSwell - nowSwell;
         
-        // FIX 2: Provide a default of 0.5 if swellIncreaseThreshold is null
         if (swellDiff >= (vessel.swellIncreaseThreshold ?? 0.5)) {
           warnings.add("Swell rising ${swellDiff.toStringAsFixed(1)}m in ${i}h.");
           break;
@@ -105,7 +103,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
     }
 
-    // FIX 3: Check if notificationsEnabled is null, default to true
     if (vessel.notificationsEnabled ?? true) {
       final hour = DateTime.now().hour;
       if (hour >= 17 || hour <= 5) {
@@ -212,17 +209,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
       future: _weatherFuture,
       builder: (context, weatherSnapshot) {
         
-        // --- STEP 2: FIX THE WHITE SCREEN ---
+        // --- UPDATED LOADING SCREEN (FIX 2) ---
         if (weatherSnapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            backgroundColor: Color(0xFFF1F5F9),
+          return Scaffold(
+            backgroundColor: const Color(0xFFF1F5F9),
             body: Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CircularProgressIndicator(color: Color(0xFF004E92)),
-                  SizedBox(height: 15),
-                  Text("Fetching Seacliff Forecast...", style: TextStyle(color: Colors.blueGrey)),
+                  const CircularProgressIndicator(color: Color(0xFF004E92)),
+                  const SizedBox(height: 20),
+                  const Text("⚓ Seacliff Fishing App", 
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                  const SizedBox(height: 8),
+                  const Text("Fetching Marine Forecast...", 
+                      style: TextStyle(color: Colors.blueGrey)),
+                  const SizedBox(height: 40),
+                  // EMERGENCY EXIT: If it takes too long, let the user in manually
+                  TextButton(
+                    onPressed: () => setState(() {
+                      _weatherFuture = Future.value({
+                        'windKnots': 0, 
+                        'windDir': '--', 
+                        'temp': 0, 
+                        'warning': 'OFFLINE',
+                        'forecasts': null
+                      });
+                    }),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.blue.shade200),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text("Skip to Dashboard >", 
+                          style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+                    ),
+                  )
                 ],
               ),
             ),
@@ -232,7 +255,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (weatherSnapshot.hasError) {
           return Scaffold(
             body: Center(
-              child: Text("Weather Connection Error: ${weatherSnapshot.error}"),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.cloud_off, size: 64, color: Colors.grey),
+                  const SizedBox(height: 16),
+                  Text("Weather Error: ${weatherSnapshot.error}"),
+                  ElevatedButton(
+                    onPressed: _handleRefresh, 
+                    child: const Text("Retry Connection")
+                  ),
+                ],
+              ),
             ),
           );
         }
@@ -248,8 +282,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final verdict = SafetyEngine.getVerdict(widget.isInshore, windSpeedNum, currentWarning);
         final Color statusColor = SafetyEngine.getStatusColor(verdict);
 
-        final myBoat = _vesselBox.isNotEmpty ? _vesselBox.getAt(0) : null;
-
+        // Safely get the boat. Check length instead of just isNotEmpty
+        final myBoat = (_vesselBox.length > 0) 
+            ? _vesselBox.getAt(0) 
+            : null;
+            
         return Scaffold(
           backgroundColor: const Color(0xFFF1F5F9),
           appBar: AppBar(
@@ -611,5 +648,3 @@ class _BriefHeaderCard extends StatelessWidget {
     );
   }
 }
-
-//
