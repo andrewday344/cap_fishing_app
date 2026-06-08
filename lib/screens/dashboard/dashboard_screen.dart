@@ -360,7 +360,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     
     Color finalColor = safetyEngineColor;
     String title = "VESSEL READY";
-    String subtitle = "Conditions: Perfect";
+    // FIXED: Use _selectedRamp.name here to remove the unused field warning
+    String subtitle = "Conditions at ${_selectedRamp.name}: Perfect";
 
     if (expired > 0) {
       finalColor = Colors.red.shade700;
@@ -374,8 +375,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: finalColor, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: finalColor.withAlpha(75), blurRadius: 10, offset: const Offset(0, 4))]),
-      child: Row(children: [const Icon(Icons.check_circle, color: Colors.white, size: 40), const SizedBox(width: 15), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)), Text(subtitle, style: const TextStyle(color: Colors.white70))])]),
+      decoration: BoxDecoration(
+        color: finalColor, 
+        borderRadius: BorderRadius.circular(20), 
+        boxShadow: [BoxShadow(color: finalColor.withAlpha(75), blurRadius: 10, offset: const Offset(0, 4))]
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.check_circle, color: Colors.white, size: 40), 
+          const SizedBox(width: 15), 
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start, 
+            children: [
+              Text(title, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)), 
+              Text(subtitle, style: const TextStyle(color: Colors.white70))
+            ]
+          )
+        ]
+      ),
     );
   }
 
@@ -395,7 +412,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildSectionLabel(String text) => Padding(padding: const EdgeInsets.only(bottom: 10), child: Text(text, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blueGrey, letterSpacing: 1.1)));
 
   String _formatSpeed(double s) => _speedUnit == SpeedUnit.kmh ? "${(s * 1.852).toStringAsFixed(1)} km/h" : "${s.toStringAsFixed(1)} kts";
-  String _formatTemp(double t) => "${t.toStringAsFixed(0)}°C";
+ 
+  String _formatTemp(double t) {
+    if (_tempUnit == TempUnit.fahrenheit) {
+      return "${((t * 9/5) + 32).toStringAsFixed(0)}°F";
+    }
+    return "${t.toStringAsFixed(0)}°C";
+  }
 }
 
 // --- HELPER CLASSES ---
