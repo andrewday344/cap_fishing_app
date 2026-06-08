@@ -125,38 +125,73 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // --- SAFETY WARNING CALCULATIONS ---
 
-  List<String> _getSafetyWarnings(VesselProfile vessel, Map<String, dynamic>? forecasts) {
+ List<String> _getSafetyWarnings(VesselProfile vessel, Map<String, dynamic>? forecasts) {
     List<String> warnings = [];
     if (forecasts == null || forecasts['wind'] == null) return warnings;
 
-    final windForecast = forecasts['wind'] as List<dynamic>;
-    final swellForecast = forecasts['swell'] as List<dynamic>?;
-    
-    if (windForecast.isEmpty) return warnings;
+    try {
+      // WillyWeather structure: forecasts -> wind -> days -> entries
+      final windData = forecasts['wind'] as Map<String, dynamic>?;
+      final windDays = windData?['days'] as List<dynamic>?;
+      if (windDays == null || windDays.isEmpty) return warnings;
 
-    final nowWind = (windForecast.first['speed'] ?? 0) / 1.852;
-    final double nowSwell = (swellForecast != null && swellForecast.isNotEmpty) 
-        ? (swellForecast.first['height'] ?? 0.0) : 0.0;
-
-    for (int i = 1; i < math.min(windForecast.length, 7); i++) {
-      final futureWind = (windForecast[i]['speed'] ?? 0) / 1.852;
-      double windPct = ((futureWind - nowWind) / nowWind) * 100;
-      
-      if (windPct >= (vessel.windIncreaseThreshold ?? 30.0) && nowWind > 5) {
-        warnings.add("Wind increasing ${windPct.toStringAsFixed(0)}% in ${i}h.");
-        break;
-      }
-
-      if (swellForecast != null && swellForecast.length > i) {
-        double futureSwell = swellForecast[i]['height'] ?? 0.0;
-        double swellDiff = futureSwell - nowSwell;
-        if (swellDiff >= (vessel.swellIncreaseThreshold ?? 0.5)) {
-          warnings.add("Swell rising ${swellDiff.toStringAsFixed(1)}m in ${i}h.");
-          break;
+      // Extract the chronological entries across days if available
+      List<dynamic> windEntries = [];
+      for (var day in windDays) {
+        if (day['entries'] != null) {
+          windEntries.addAll(day['entries']);
         }
       }
+      if (windEntries.isEmpty) return warnings;
+
+      // Safe extraction of current wind speed (knots fallback if kmh)
+      final nowWind = (windEntries.first['speed'] ?? 0) / 1.852;
+
+      // Safe extraction of swell entries
+      List<dynamic> swellEntries = [];
+      if (forecasts['swell'] != null) {
+        final swellData = forecasts['swell'] as Map<String, dynamic>?;
+        final swellDays = swellData?['days'] as List<dynamic>?;
+        if (swellDays != null) {
+          for (var day in swellDays) {
+            if (day['entries'] != null) {
+              swellEntries.addAll(day['entries']);
+            }
+          }
+        }
+      }
+
+      final double nowSwell = swellEntries.isNotEmpty 
+          ? (swellEntries.first['height'] ?? 0.0).toDouble() 
+          : 0.0;
+
+      // Look ahead up to 7 entries (intervals)
+      for (int i = 1; i < math.min(windEntries.length, 7); i++) {
+        final futureWind = (windEntries[i]['speed'] ?? 0) / 1.852;
+        
+        if (nowWind > 0) {
+          double windPct = ((futureWind - nowWind) / nowWind) * 100;
+          if (windPct >= (vessel.windIncreaseThreshold ?? 30.0) && nowWind > 5) {
+            warnings.add("Wind increasing ${windPct.toStringAsFixed(0)}% in ${i}h.");
+            break;
+          }
+        }
+
+        if (swellEntries.length > i) {
+          double futureSwell = (swellEntries[i]['height'] ?? 0.0).toDouble();
+          double swellDiff = futureSwell - nowSwell;
+          if (swellDiff >= (vessel.swellIncreaseThreshold ?? 0.5)) {
+            warnings.add("Swell rising ${swellDiff.toStringAsFixed(1)}m in ${i}h.");
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Error parsing safety warnings: $e");
+      warnings.add("Unable to calculate dynamic safety thresholds.");
     }
 
+    // Low light notification rule
     if (vessel.notificationsEnabled ?? true) {
       final hour = DateTime.now().hour;
       if (hour >= 17 || hour <= 5) {
