@@ -121,7 +121,8 @@ class _SafetyEquipmentScreenState extends State<SafetyEquipmentScreen> {
                 ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showAddDialog(),
-        label: const Text("ADD GEAR"),
+        //label: const Text("ADD GEAR"),
+        label: const Text("ADD GEAR", style: TextStyle(color: Colors.white, fontSize: 16)),
         icon: const Icon(Icons.add_moderator),
         backgroundColor: const Color(0xFF004E92),
       ),
