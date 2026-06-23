@@ -68,6 +68,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _loadVesselData();
   }
 
+
   // --- CORE LOGIC & DATA ---
 
   Future<void> _loadVesselData() async {
@@ -114,6 +115,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _loadVesselData();
   }
 
+  
   void _checkForFishingMatch(Map<String, dynamic> liveData) async {
     String? alertMessage = await NotificationEngine.checkConditions(liveData);
     if (alertMessage != null && mounted) {
@@ -252,13 +254,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final verdict = SafetyEngine.getVerdict(widget.isInshore, windSpeedNum, currentWarning);
         final Color statusColor = SafetyEngine.getStatusColor(verdict);
 
-        // 3. SAFE BOAT FETCH
+        // 3. DEFENSIVE/SAFE BOAT FETCH WITH AUTOMATIC CORRUPTION RECOVERY
         VesselProfile? myBoat;
         try {
           if (_vesselBox.isOpen && _vesselBox.isNotEmpty) {
+            // Attempt to fetch the vessel profile
             myBoat = _vesselBox.getAt(0);
           }
-        } catch (e) {
+        } catch (e, stackTrace) {
+          // If a deserialization or type error occurs, log it and clear the corrupted index
+          debugPrint("Corrupted vessel profile detected: $e");
+          debugPrint(stackTrace.toString());
+          
+          try {
+            // Safely delete just the corrupted record at index 0 without wiping the whole box
+            if (_vesselBox.isNotEmpty) {
+              _vesselBox.deleteAt(0); // FIXED: Removed 'await' so it doesn't crash the synchronous build method
+            }
+          } catch (deleteError) {
+            debugPrint("Failed to delete corrupted record: $deleteError");
+          }
+          
           myBoat = null; 
         }
 
@@ -395,7 +411,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     
     Color finalColor = safetyEngineColor;
     String title = "VESSEL READY";
-    // FIXED: Use _selectedRamp.name here to remove the unused field warning
     String subtitle = "Conditions at ${_selectedRamp.name}: Perfect";
 
     if (expired > 0) {
