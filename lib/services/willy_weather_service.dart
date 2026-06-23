@@ -21,15 +21,20 @@ class WillyWeatherService {
           .timeout(const Duration(seconds: 10));
       
       if (response.statusCode == 200) {
-        debugPrint("SUCCESS: Live data retrieved.");
+        debugPrint("✅ SUCCESS: Live data retrieved.");
         return _processData(json.decode(response.body));
       } else {
-        debugPrint("PROXY ERROR: ${response.statusCode}. Falling back to simulation data.");
+        // --- THE DIAGNOSTIC SNIFFER ---
+        debugPrint("❌ WILLYWEATHER CONNECTION FAILED!");
+        debugPrint("HTTP Status Code: ${response.statusCode}");
+        debugPrint("Server Response: ${response.body}");
+        debugPrint("Falling back to simulation data.");
         return _getSimulationData();
       }
     } catch (e) {
       // This catch block is the "Safety Net" that stops the cycling
-      debugPrint("FETCH FAILED ($e). Loading simulation data to open Dashboard...");
+      debugPrint("🚨 CRITICAL API CRASH ($e).");
+      debugPrint("Loading simulation data to open Dashboard...");
       return _getSimulationData();
     }
   }
