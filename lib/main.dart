@@ -8,6 +8,9 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   String debugStatus = "Starting...";
+
+  
+    await Hive.openBox('settings');
   
   try {
     debugStatus = "Initializing Hive...";
@@ -56,7 +59,7 @@ class SeacliffApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Seacliff Fishing App',
+      title: 'Conditions Are Perfect Fishing App',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF004E92)),

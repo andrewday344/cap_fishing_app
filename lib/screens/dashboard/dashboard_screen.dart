@@ -18,6 +18,8 @@ import '../fish_gallery_screen.dart';
 import '../safety/safety_equipment_screen.dart';
 import '../safety/pre_launch_screen.dart';
 import '../vessel/vessel_log_screen.dart';
+// Import your new screen here
+import '../settings/algorithm_settings_screen.dart'; 
 
 enum SpeedUnit { knots, kmh }
 enum TempUnit { celsius, fahrenheit }
@@ -132,12 +134,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (forecasts == null || forecasts['wind'] == null) return warnings;
 
     try {
-      // WillyWeather structure: forecasts -> wind -> days -> entries
       final windData = forecasts['wind'] as Map<String, dynamic>?;
       final windDays = windData?['days'] as List<dynamic>?;
       if (windDays == null || windDays.isEmpty) return warnings;
 
-      // Extract the chronological entries across days if available
       List<dynamic> windEntries = [];
       for (var day in windDays) {
         if (day['entries'] != null) {
@@ -146,10 +146,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
       if (windEntries.isEmpty) return warnings;
 
-      // Safe extraction of current wind speed (knots fallback if kmh)
       final nowWind = (windEntries.first['speed'] ?? 0) / 1.852;
 
-      // Safe extraction of swell entries
       List<dynamic> swellEntries = [];
       if (forecasts['swell'] != null) {
         final swellData = forecasts['swell'] as Map<String, dynamic>?;
@@ -167,7 +165,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ? (swellEntries.first['height'] ?? 0.0).toDouble() 
           : 0.0;
 
-      // Look ahead up to 7 entries (intervals)
       for (int i = 1; i < math.min(windEntries.length, 7); i++) {
         final futureWind = (windEntries[i]['speed'] ?? 0) / 1.852;
         
@@ -193,7 +190,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       warnings.add("Unable to calculate dynamic safety thresholds.");
     }
 
-    // Low light notification rule
     if (vessel.notificationsEnabled ?? true) {
       final hour = DateTime.now().hour;
       if (hour >= 17 || hour <= 5) {
@@ -212,7 +208,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       future: _weatherFuture,
       builder: (context, weatherSnapshot) {
         
-        // 1. HYPER-SAFE LOADING STATE
         if (weatherSnapshot.connectionState == ConnectionState.waiting) {
           return Scaffold(
             backgroundColor: const Color(0xFFF1F5F9),
@@ -222,7 +217,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 children: [
                   const CircularProgressIndicator(color: Color(0xFF004E92)),
                   const SizedBox(height: 20),
-                  const Text("⚓ Seacliff Fishing App", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                  const Text("⚓ Conditions Are Perfect Fishing App", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                   const Text("Fetching Marine Forecast...", style: TextStyle(color: Colors.blueGrey)),
                   const SizedBox(height: 40),
                   TextButton(
@@ -244,7 +239,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           );
         }
 
-        // 2. DATA FALLBACKS
         final data = weatherSnapshot.data ?? {
           'windKnots': 0, 'windDir': '--', 'temp': 0, 'warning': 'NIL', 'forecasts': null,
         };
@@ -254,41 +248,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final verdict = SafetyEngine.getVerdict(widget.isInshore, windSpeedNum, currentWarning);
         final Color statusColor = SafetyEngine.getStatusColor(verdict);
 
-        // 3. DEFENSIVE/SAFE BOAT FETCH WITH AUTOMATIC CORRUPTION RECOVERY
         VesselProfile? myBoat;
         try {
           if (_vesselBox.isOpen && _vesselBox.isNotEmpty) {
-            // Attempt to fetch the vessel profile
             myBoat = _vesselBox.getAt(0);
           }
         } catch (e, stackTrace) {
-          // If a deserialization or type error occurs, log it and clear the corrupted index
           debugPrint("Corrupted vessel profile detected: $e");
           debugPrint(stackTrace.toString());
-          
           try {
-            // Safely delete just the corrupted record at index 0 without wiping the whole box
             if (_vesselBox.isNotEmpty) {
-              _vesselBox.deleteAt(0); // FIXED: Removed 'await' so it doesn't crash the synchronous build method
+              _vesselBox.deleteAt(0); 
             }
           } catch (deleteError) {
             debugPrint("Failed to delete corrupted record: $deleteError");
           }
-          
           myBoat = null; 
         }
 
         return Scaffold(
           backgroundColor: const Color(0xFFF1F5F9),
+          drawer: _buildAppDrawer(context), // <--- ADDED DRAWER HERE
           appBar: AppBar(
             backgroundColor: Colors.white,
             elevation: 0,
-            title: const Text("Seacliff Fishing", style: TextStyle(fontWeight: FontWeight.w900)),
+            title: const Text("Conditions are Perfect Fishing", style: TextStyle(fontWeight: FontWeight.w900)),
             centerTitle: true,
-            leading: IconButton(icon: const Icon(Icons.refresh, size: 28), onPressed: _handleRefresh),
+            leading: Builder(
+              builder: (context) => IconButton(
+                icon: const Icon(Icons.menu, size: 28, color: Colors.black),
+                onPressed: () => Scaffold.of(context).openDrawer(),
+              ),
+            ),
             actions: [
+              IconButton(icon: const Icon(Icons.refresh, size: 28, color: Colors.black), onPressed: _handleRefresh),
               PopupMenuButton(
-                icon: const Icon(Icons.settings, size: 28),
+                icon: const Icon(Icons.settings, size: 28, color: Colors.black),
                 itemBuilder: (context) => [
                   PopupMenuItem(
                     child: Text("Speed: ${_speedUnit.name.toUpperCase()}"),
@@ -382,6 +377,49 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         );
       },
+    );
+  }
+
+  // --- DRAWER HELPER ---
+  Widget _buildAppDrawer(BuildContext context) {
+    return Drawer(
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          const DrawerHeader(
+            decoration: BoxDecoration(color: Color(0xFF004E92)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.directions_boat, size: 50, color: Colors.white),
+                SizedBox(height: 10),
+                Text("Conditions are Perfect", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.settings_input_composite),
+            title: const Text("Algorithm Settings"),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const AlgorithmSettingsScreen()));
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.import_export),
+            title: const Text("Import Catch History"),
+            onTap: () {
+              Navigator.pop(context);
+            },
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.info_outline),
+            title: const Text("About"),
+            onTap: () => Navigator.pop(context),
+          ),
+        ],
+      ),
     );
   }
 
