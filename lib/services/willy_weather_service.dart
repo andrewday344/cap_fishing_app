@@ -10,12 +10,16 @@ class WillyWeatherService {
   Future<Map<String, dynamic>> getMarineWeather() async {
     final String targetUrl = 'https://api.willyweather.com.au/v2/$apiKey/locations/$locationId/weather.json?observational=true&forecasts=wind,tides,swell&days=5';
     
+    // We swap out the broken 'allorigins' for a much more reliable proxy
+    final String proxyUrl = 'https://corsproxy.io/?${Uri.encodeComponent(targetUrl)}';
+    
+    // Smart routing: Only use the proxy if running on Web (GitHub Pages)
+    final String finalUrl = kIsWeb ? proxyUrl : targetUrl;
+
     debugPrint("--- WILLYWEATHER ATTEMPTING FETCH ---");
 
     try {
-      // Hitting WillyWeather directly, bypassing the proxy
-      // Shortened timeout to 10s to prevent the "cycling" hang on iPhone
-      final response = await http.get(Uri.parse(targetUrl))
+      final response = await http.get(Uri.parse(finalUrl))
           .timeout(const Duration(seconds: 10));
       
       if (response.statusCode == 200) {
