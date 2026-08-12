@@ -20,6 +20,7 @@ import '../safety/pre_launch_screen.dart';
 import '../vessel/vessel_log_screen.dart';
 // Import your new screen here
 import '../settings/algorithm_settings_screen.dart'; 
+import '../../services/csv_import_service.dart';
 
 enum SpeedUnit { knots, kmh }
 enum TempUnit { celsius, fahrenheit }
@@ -409,7 +410,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             leading: const Icon(Icons.import_export),
             title: const Text("Import Catch History"),
             onTap: () {
-              Navigator.pop(context);
+              Navigator.pop(context); // Close the drawer first
+              // Trigger the bulk importer
+              CsvImportService.importCatchHistory(context); 
             },
           ),
           const Divider(),
