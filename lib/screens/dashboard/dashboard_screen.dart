@@ -7,6 +7,7 @@ import '../../core/safety_engine.dart';
 import '../../core/notification_engine.dart'; 
 import '../../services/willy_weather_service.dart';
 import '../../services/database_service.dart';
+import '../../services/csv_import_service.dart'; 
 import '../../models/safety_item_model.dart';
 import '../../models/vessel_log_model.dart';
 import '../../models/vessel_profile.dart'; 
@@ -18,9 +19,7 @@ import '../fish_gallery_screen.dart';
 import '../safety/safety_equipment_screen.dart';
 import '../safety/pre_launch_screen.dart';
 import '../vessel/vessel_log_screen.dart';
-// Import your new screen here
 import '../settings/algorithm_settings_screen.dart'; 
-import '../../services/csv_import_service.dart';
 
 enum SpeedUnit { knots, kmh }
 enum TempUnit { celsius, fahrenheit }
@@ -269,7 +268,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         return Scaffold(
           backgroundColor: const Color(0xFFF1F5F9),
-          drawer: _buildAppDrawer(context), // <--- ADDED DRAWER HERE
+          drawer: _buildAppDrawer(context),
           appBar: AppBar(
             backgroundColor: Colors.white,
             elevation: 0,
@@ -282,29 +281,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
             actions: [
+              // Clean top right! Only the refresh icon remains.
               IconButton(icon: const Icon(Icons.refresh, size: 28, color: Colors.black), onPressed: _handleRefresh),
-              PopupMenuButton(
-                icon: const Icon(Icons.settings, size: 28, color: Colors.black),
-                itemBuilder: (context) => [
-                  PopupMenuItem(
-                    child: Text("Speed: ${_speedUnit.name.toUpperCase()}"),
-                    onTap: () => setState(() => _speedUnit = _speedUnit == SpeedUnit.kmh ? SpeedUnit.knots : SpeedUnit.kmh),
-                  ),
-                  PopupMenuItem(
-                    child: const Text("Fleet & Vessel Settings"),
-                    onTap: () {
-                      Future.delayed(Duration.zero, () {
-                        if (context.mounted) {
-                          Navigator.push(
-                            context, 
-                            MaterialPageRoute(builder: (c) => const VesselSettingsScreen()),
-                          ).then((_) { if (mounted) setState(() {}); });
-                        }
-                      });
-                    },
-                  ),
-                ],
-              ),
             ],
           ),
           body: SingleChildScrollView(
@@ -398,6 +376,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ],
             ),
           ),
+          
+          // FLEET & VESSEL - Moved from popup!
+          ListTile(
+            leading: const Icon(Icons.directions_boat_filled_outlined),
+            title: const Text("Fleet & Vessel Settings"),
+            onTap: () {
+              Navigator.pop(context); // Close drawer
+              Navigator.push(
+                context, 
+                MaterialPageRoute(builder: (c) => const VesselSettingsScreen()),
+              ).then((_) { if (mounted) setState(() {}); });
+            },
+          ),
+          
+          // SPEED TOGGLE - Moved from popup!
+          ListTile(
+            leading: const Icon(Icons.speed),
+            title: Text("Speed Unit: ${_speedUnit.name.toUpperCase()}"),
+            trailing: const Icon(Icons.sync, color: Colors.blueGrey, size: 20),
+            onTap: () {
+              setState(() {
+                _speedUnit = _speedUnit == SpeedUnit.kmh ? SpeedUnit.knots : SpeedUnit.kmh;
+              });
+              // We intentionally don't pop the drawer here so the user sees the text instantly update!
+            },
+          ),
+          
+          const Divider(),
+          
           ListTile(
             leading: const Icon(Icons.settings_input_composite),
             title: const Text("Algorithm Settings"),
@@ -410,12 +417,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
             leading: const Icon(Icons.import_export),
             title: const Text("Import Catch History"),
             onTap: () {
-              Navigator.pop(context); // Close the drawer first
-              // Trigger the bulk importer
-              CsvImportService.importCatchHistory(context); 
+              Navigator.pop(context);
+              CsvImportService.importCatchHistory(context);
             },
           ),
+          
           const Divider(),
+          
           ListTile(
             leading: const Icon(Icons.info_outline),
             title: const Text("About"),
