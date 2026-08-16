@@ -1,37 +1,71 @@
-import '../models/catch_model.dart';
+import 'package:flutter/foundation.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import '../services/database_service.dart';
+import '../models/catch_model.dart';
 
 class NotificationEngine {
-  static const double windTolerance = 4.0; 
-  static const double tempTolerance = 3.0; 
-
-  static Future<String?> checkConditions(Map<String, dynamic> currentData) async {
-    final List<Catch> history = await DatabaseService.instance.readAllCatches();
-    
-    if (history.isEmpty) return null;
-
-    final double curWind = (currentData['windKnots'] as num).toDouble();
-    final double curTemp = (currentData['temp'] as num).toDouble();
-    final String curTide = (currentData['nextTide'] ?? "").toString().toLowerCase();
-
-    for (var record in history) {
-      bool windMatch = (record.wind - curWind).abs() <= windTolerance;
-      bool tempMatch = (record.temp - curTemp).abs() <= tempTolerance; // Now we use this!
+  /// Compares live weather to historical catches and returns an alert if conditions match.
+  static Future<String?> checkConditions(Map<String, dynamic> liveData) async {
+    try {
+      // 1. EXTRACT LIVE CONDITIONS
+      double liveWind = (liveData['windKnots'] is num) ? (liveData['windKnots'] as num).toDouble() : 0.0;
       
-      bool tideMatch = false;
-      if (record.tide.isNotEmpty && curTide.isNotEmpty) {
-        String logTide = record.tide.split(' ')[0].toLowerCase();
-        if (curTide.contains(logTide)) {
-          tideMatch = true;
+      String liveTideStr = (liveData['nextTide'] ?? "").toString().toUpperCase();
+      bool isLiveHighTide = liveTideStr.contains('H'); 
+      
+      // 2. FETCH USER ALGORITHM SETTINGS
+      var box = Hive.box('settings');
+      double windTol = box.get('alg_wind_tol', defaultValue: 5.0);
+      bool requireTideMatch = box.get('alg_tide_match', defaultValue: true);
+      double minScore = box.get('alg_min_score', defaultValue: 80.0);
+
+      // 3. FETCH HISTORICAL CATCHES
+      // 👇 FIXED: Changed to readAllCatches() to match your DatabaseService 👇
+      List<Catch> history = await DatabaseService.instance.readAllCatches();
+      
+      if (history.isEmpty) return null; 
+
+      Set<String> recommendedSpecies = {};
+
+      // 4. THE MATCHING ALGORITHM
+      for (var pastCatch in history) {
+        double score = 100.0; 
+        
+        // --- A. WIND PENALTY ---
+        double windDiff = (pastCatch.wind - liveWind).abs();
+        
+        if (windDiff > windTol) {
+          score -= ((windDiff - windTol) * 10); 
+        }
+
+        // --- B. TIDE PENALTY ---
+        if (requireTideMatch) {
+           String pastTide = pastCatch.tide.toUpperCase();
+           bool isPastHighTide = pastTide.contains('H') || pastTide.contains('HIGH');
+           
+           if (isLiveHighTide != isPastHighTide) {
+             score -= 25.0; 
+           }
+        }
+
+        // --- C. THE VERDICT ---
+        if (score >= minScore) {
+          recommendedSpecies.add(pastCatch.species);
         }
       }
 
-      // Check all three for a high-confidence "Intel" match
-      if (windMatch && tideMatch && tempMatch) {
-        return "Conditions match your ${record.species} catch! Time to hit the water.";
+      // 5. FORMAT THE ALERT
+      if (recommendedSpecies.isNotEmpty) {
+        List<String> speciesList = recommendedSpecies.toList();
+        String speciesText = speciesList.join(", ");
+        return "🎯 CONDITIONS ARE PERFECT FOR: $speciesText";
       }
-    }
 
-    return null; 
+      return null; 
+      
+    } catch (e) {
+      debugPrint("Engine Error: $e");
+      return null; 
+    }
   }
 }
