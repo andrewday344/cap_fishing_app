@@ -3,20 +3,22 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:csv/csv.dart';
-//import 'package:hive_flutter/hive_flutter.dart';
 import 'package:file_picker/file_picker.dart';
+
+// 👇 Import your models and database service 👇
+import '../models/catch_model.dart';
+import '../services/database_service.dart';
 
 class CsvImportService {
   static Future<void> importCatchHistory(BuildContext context) async {
     try {
-      // Fixed FilePicker syntax
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['csv'],
         withData: true,
       );
 
-      if (result == null || result.files.isEmpty) return; // User canceled the picker
+      if (result == null || result.files.isEmpty) return; // User canceled
 
       if (!context.mounted) return;
 
@@ -37,7 +39,6 @@ class CsvImportService {
 
       if (csvString.isEmpty) throw Exception("File is empty or corrupted.");
 
-      // Fixed CsvToListConverter capitalization
       List<List<dynamic>> rows = const CsvToListConverter().convert(csvString);
       
       if (rows.length <= 1) {
@@ -46,23 +47,33 @@ class CsvImportService {
       }
 
       int importedCount = 0;
-      
-      // Box catchBox = Hive.box('catches_v2'); 
-      Map<dynamic, dynamic> batchData = {};
 
+      // Skip the Header row (index 0) and process the data
       for (int i = 1; i < rows.length; i++) {
         var row = rows[i];
-        if (row.isEmpty || row.length < 5) continue; 
+        
+        // We need at least a Date and a Species to make a valid log
+        if (row.isEmpty || row.length < 2) continue; 
 
         try {
+          // Safely map the CSV columns to your Catch model
+          final newCatch = Catch(
+            date: row[0].toString(),
+            species: row[1].toString(),
+            quantity: row.length > 2 ? (int.tryParse(row[2].toString()) ?? 1) : 1,
+            notes: row.length > 3 ? row[3].toString() : "",
+            temp: row.length > 4 ? (double.tryParse(row[4].toString()) ?? 0.0) : 0.0,
+            wind: row.length > 5 ? (double.tryParse(row[5].toString()) ?? 0.0) : 0.0,
+            tide: row.length > 6 ? row[6].toString() : "Unknown",
+          );
+          
+          // Send it directly to your existing database service!
+          await DatabaseService.instance.saveCatch(newCatch);
           importedCount++;
+          
         } catch (e) {
           debugPrint("Skipped row $i due to parsing error: $e");
         }
-      }
-
-      if (batchData.isNotEmpty) {
-        // await catchBox.putAll(batchData); 
       }
 
       if (context.mounted) {
