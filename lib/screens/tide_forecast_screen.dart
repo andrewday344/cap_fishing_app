@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'dart:ui' as ui;
+import 'dart:math' as math; // Added for the math.min safety clamp
 
 class TideForecastScreen extends StatefulWidget {
   final Map<String, dynamic> forecastData;
@@ -16,11 +17,35 @@ class _TideForecastScreenState extends State<TideForecastScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // --- THE SAFETY GUARD ---
+    if (widget.forecastData['tides'] == null || 
+        widget.forecastData['tides']['days'] == null || 
+        (widget.forecastData['tides']['days'] as List).isEmpty) {
+      return Scaffold(
+        appBar: AppBar(title: const Text("Tide Forecast")),
+        body: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.water_drop_outlined, size: 50, color: Colors.grey),
+              SizedBox(height: 10),
+              Text("No tide data available.", style: TextStyle(fontWeight: FontWeight.bold)),
+              Text("Please check your internet or refresh.", style: TextStyle(color: Colors.grey)),
+            ],
+          ),
+        ),
+      );
+    }
+
     List<dynamic> allEntries = [];
     List<Map<String, dynamic>> dayBoundaries = [];
 
+    // --- DATA PROCESSING WITH SAFETY CLAMP ---
     try {
-      for (int i = 0; i < _daysToShow; i++) {
+      int availableDays = (widget.forecastData['tides']['days'] as List).length;
+      int daysToProcess = math.min(_daysToShow, availableDays);
+
+      for (int i = 0; i < daysToProcess; i++) {
         var dayData = widget.forecastData['tides']['days'][i];
         dayBoundaries.add({
           'startIndex': allEntries.length,
@@ -29,7 +54,7 @@ class _TideForecastScreenState extends State<TideForecastScreen> {
         allEntries.addAll(dayData['entries']);
       }
     } catch (e) {
-      return const Scaffold(body: Center(child: Text("Tide data unavailable")));
+      return const Scaffold(body: Center(child: Text("Error parsing tide data")));
     }
 
     return Scaffold(
@@ -38,6 +63,7 @@ class _TideForecastScreenState extends State<TideForecastScreen> {
         title: const Text("Seacliff Tide Forecast", style: TextStyle(color: Colors.black87, fontSize: 18)),
         backgroundColor: Colors.white,
         elevation: 1,
+        iconTheme: const IconThemeData(color: Colors.blue),
       ),
       body: Column(
         children: [
@@ -47,7 +73,7 @@ class _TideForecastScreenState extends State<TideForecastScreen> {
             children: [1, 3, 5].map((day) => Padding(
               padding: const EdgeInsets.symmetric(horizontal: 6),
               child: ChoiceChip(
-                label: Text("$day-Day"), // Fixed: Removed unnecessary braces
+                label: Text("$day-Day"), 
                 selected: _daysToShow == day,
                 onSelected: (selected) {
                   if (selected) {
@@ -86,8 +112,9 @@ class _TideForecastScreenState extends State<TideForecastScreen> {
   }
 
   void _handleTouch(Offset localPosition, List<dynamic> entries) {
+    if (entries.isEmpty) return;
     double chartWidth = MediaQuery.of(context).size.width - 20;
-    double stepX = chartWidth / (entries.length - 1);
+    double stepX = chartWidth / (entries.length > 1 ? entries.length - 1 : 1);
     int index = (localPosition.dx / stepX).round().clamp(0, entries.length - 1);
     setState(() => _hoverIndex = index);
   }
