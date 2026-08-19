@@ -11,6 +11,7 @@ import '../../services/csv_import_service.dart';
 import '../../models/safety_item_model.dart';
 import '../../models/vessel_log_model.dart';
 import '../../models/vessel_profile.dart'; 
+import '../../models/ramp_directory.dart'; // Import single source for Ramp
 import '../logbook/logbook_screen.dart';
 import '../catch_log/catch_log_screen.dart';
 import '../wind_forecast_screen.dart';
@@ -23,13 +24,6 @@ import '../settings/algorithm_settings_screen.dart';
 
 enum SpeedUnit { knots, kmh }
 enum TempUnit { celsius, fahrenheit }
-
-class Ramp {
-  final String name;
-  final double lat;
-  final double lng;
-  Ramp(this.name, this.lat, this.lng);
-}
 
 class DashboardScreen extends StatefulWidget {
   final bool isInshore;
@@ -51,25 +45,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<VesselLog> _vesselLogs = [];
   bool _isDataLoading = true;
   
-  final List<Ramp> _saRamps = [
-    Ramp("Seacliff", -35.0436, 138.5194),
-    Ramp("North Haven", -34.7939, 138.4844),
-    Ramp("O'Sullivan Beach", -35.1278, 138.4689),
-    Ramp("West Beach", -34.9383, 138.4994),
-    Ramp("Edithburgh", -35.0833, 137.7500),
-  ];
+  // Single definition of _selectedRamp using RampDirectory
   late Ramp _selectedRamp;
 
   @override
   void initState() {
     super.initState();
-    _selectedRamp = _saRamps[0];
+    _selectedRamp = RampDirectory.allRamps.first; // Default to Seacliff
     _vesselBox = Hive.box<VesselProfile>('vessel_profile');
     _weatherFuture = _fetchWeatherAndCheckMatches(); 
     _initSpeedometer();
     _loadVesselData();
   }
-
 
   // --- CORE LOGIC & DATA ---
 
@@ -105,7 +92,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<Map<String, dynamic>> _fetchWeatherAndCheckMatches() async {
-    final data = await WillyWeatherService().getMarineWeather();
+    // Pass the selected Ramp's willyWeatherId to the service
+    final data = await WillyWeatherService().getMarineWeather(
+      locationId: _selectedRamp.willyWeatherId,
+    );
     _checkForFishingMatch(data);
     return data;
   }
@@ -117,7 +107,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _loadVesselData();
   }
 
-  
   void _checkForFishingMatch(Map<String, dynamic> liveData) async {
     String? alertMessage = await NotificationEngine.checkConditions(liveData);
     if (alertMessage != null && mounted) {
@@ -127,9 +116,85 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  void _showRampSelector() {
+    final groupedRamps = RampDirectory.getRampsByRegion();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.75,
+        decoration: const BoxDecoration(
+          color: Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+        ),
+        child: Column(
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 10, bottom: 20),
+              width: 50,
+              height: 5,
+              decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(10)),
+            ),
+            const Text("Select Launch Location", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 15),
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: groupedRamps.keys.length,
+                itemBuilder: (context, index) {
+                  String region = groupedRamps.keys.elementAt(index);
+                  List<Ramp> ramps = groupedRamps[region]!;
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Text(region.toUpperCase(), 
+                          style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.blueGrey, letterSpacing: 1.2)),
+                      ),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(15),
+                          border: Border.all(color: Colors.black12),
+                        ),
+                        child: Column(
+                          children: ramps.map((ramp) {
+                            bool isSelected = _selectedRamp.name == ramp.name;
+                            return ListTile(
+                              leading: Icon(Icons.location_on, color: isSelected ? Colors.blue : Colors.grey.shade400),
+                              title: Text(ramp.name, style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                              subtitle: Text(ramp.region, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                              trailing: isSelected ? const Icon(Icons.check_circle, color: Colors.blue) : null,
+                              onTap: () {
+                                setState(() {
+                                  _selectedRamp = ramp;
+                                });
+                                _handleRefresh(); 
+                                Navigator.pop(context);
+                              },
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // --- SAFETY WARNING CALCULATIONS ---
 
- List<String> _getSafetyWarnings(VesselProfile vessel, Map<String, dynamic>? forecasts) {
+  List<String> _getSafetyWarnings(VesselProfile vessel, Map<String, dynamic>? forecasts) {
     List<String> warnings = [];
     if (forecasts == null || forecasts['wind'] == null) return warnings;
 
@@ -218,20 +283,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   const CircularProgressIndicator(color: Color(0xFF004E92)),
                   const SizedBox(height: 20),
                   const Text("⚓ Conditions Are Perfect Fishing App", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                  const Text("Fetching Marine Forecast...", style: TextStyle(color: Colors.blueGrey)),
+                  Text("Fetching Marine Forecast for ${_selectedRamp.name}...", style: const TextStyle(color: Colors.blueGrey)),
                   const SizedBox(height: 40),
                   TextButton(
                     onPressed: () => setState(() {
                       _weatherFuture = Future.value({'windKnots': 0, 'windDir': '--', 'temp': 0, 'warning': 'OFFLINE', 'forecasts': null});
                     }),
                     child: const Text("Skip to Dashboard >", style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
-                  ),
-                  TextButton(
-                    onPressed: () async {
-                      await _vesselBox.clear();
-                      if (mounted) setState(() {});
-                    },
-                    child: const Text("Wipe Fleet Data (Fix Crash)", style: TextStyle(color: Colors.redAccent, fontSize: 12)),
                   ),
                 ],
               ),
@@ -253,16 +311,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           if (_vesselBox.isOpen && _vesselBox.isNotEmpty) {
             myBoat = _vesselBox.getAt(0);
           }
-        } catch (e, stackTrace) {
-          debugPrint("Corrupted vessel profile detected: $e");
-          debugPrint(stackTrace.toString());
-          try {
-            if (_vesselBox.isNotEmpty) {
-              _vesselBox.deleteAt(0); 
-            }
-          } catch (deleteError) {
-            debugPrint("Failed to delete corrupted record: $deleteError");
-          }
+        } catch (e) {
           myBoat = null; 
         }
 
@@ -281,7 +330,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
             actions: [
-              // Clean top right! Only the refresh icon remains.
               IconButton(icon: const Icon(Icons.refresh, size: 28, color: Colors.black), onPressed: _handleRefresh),
             ],
           ),
@@ -290,6 +338,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Location Selector Bar
+                InkWell(
+                  onTap: _showRampSelector,
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.blue.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.location_on, color: Colors.blue),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(_selectedRamp.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                              Text(_selectedRamp.region, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.unfold_more, color: Colors.blueGrey),
+                      ],
+                    ),
+                  ),
+                ),
+
                 if (myBoat != null) _buildSafetyAlerts(myBoat, data['forecasts']),
                 
                 _buildSafetySummaryCard(statusColor),
@@ -377,12 +455,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           
-          // FLEET & VESSEL - Moved from popup!
           ListTile(
             leading: const Icon(Icons.directions_boat_filled_outlined),
             title: const Text("Fleet & Vessel Settings"),
             onTap: () {
-              Navigator.pop(context); // Close drawer
+              Navigator.pop(context);
               Navigator.push(
                 context, 
                 MaterialPageRoute(builder: (c) => const VesselSettingsScreen()),
@@ -390,7 +467,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             },
           ),
           
-          // SPEED TOGGLE - Moved from popup!
           ListTile(
             leading: const Icon(Icons.speed),
             title: Text("Speed Unit: ${_speedUnit.name.toUpperCase()}"),
@@ -399,7 +475,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               setState(() {
                 _speedUnit = _speedUnit == SpeedUnit.kmh ? SpeedUnit.knots : SpeedUnit.kmh;
               });
-              // We intentionally don't pop the drawer here so the user sees the text instantly update!
             },
           ),
           
