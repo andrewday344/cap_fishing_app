@@ -20,7 +20,7 @@ class LocationService {
     return Geolocator.distanceBetween(
       currentLat, 
       currentLon, 
-      rampLat, 
+      rampLat,              
       rampLon
     );
   }

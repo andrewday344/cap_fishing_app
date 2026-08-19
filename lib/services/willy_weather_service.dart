@@ -5,18 +5,15 @@ import 'package:flutter/foundation.dart';
 
 class WillyWeatherService {
   final String apiKey = 'MjkzZmUzMTVlYTdhNDIzNjRiZjhjZG'; 
-  final String locationId = '9765';
 
-  Future<Map<String, dynamic>> getMarineWeather() async {
+  // Accept dynamic locationId (defaults to Seacliff: '9765')
+  Future<Map<String, dynamic>> getMarineWeather({String locationId = '9765'}) async {
     final String targetUrl = 'https://api.willyweather.com.au/v2/$apiKey/locations/$locationId/weather.json?observational=true&forecasts=wind,tides,swell&days=5';
     
-    // We swap out the broken 'allorigins' for a much more reliable proxy
     final String proxyUrl = 'https://corsproxy.io/?${Uri.encodeComponent(targetUrl)}';
-    
-    // Smart routing: Only use the proxy if running on Web (GitHub Pages)
     final String finalUrl = kIsWeb ? proxyUrl : targetUrl;
 
-    debugPrint("--- WILLYWEATHER ATTEMPTING FETCH ---");
+    debugPrint("--- WILLYWEATHER ATTEMPTING FETCH FOR LOCATION $locationId ---");
 
     try {
       final response = await http.get(Uri.parse(finalUrl))
@@ -26,23 +23,16 @@ class WillyWeatherService {
         debugPrint("✅ SUCCESS: Live data retrieved.");
         return _processData(json.decode(response.body));
       } else {
-        // --- THE DIAGNOSTIC SNIFFER ---
         debugPrint("❌ WILLYWEATHER CONNECTION FAILED!");
-        debugPrint("HTTP Status Code: ${response.statusCode}");
-        debugPrint("Server Response: ${response.body}");
-        debugPrint("Falling back to simulation data.");
         return _getSimulationData();
       }
     } catch (e) {
-      // This catch block is the "Safety Net" that stops the cycling
       debugPrint("🚨 CRITICAL API CRASH ($e).");
-      debugPrint("Loading simulation data to open Dashboard...");
       return _getSimulationData();
     }
   }
 
   Map<String, dynamic> _processData(Map<String, dynamic> data) {
-    // Check if observational data exists; if not, use empty map
     final obs = data['observational']?['observations'];
     final forecasts = data['forecasts'];
 
@@ -62,7 +52,6 @@ class WillyWeatherService {
     };
   }
 
-  // --- FALLBACK: Simulation Data ---
   Map<String, dynamic> _getSimulationData() {
     return _processData({
       "forecasts": {
@@ -79,7 +68,6 @@ class WillyWeatherService {
     });
   }
 
-  // --- HELPERS ---
   String _getNextTide(Map<String, dynamic>? forecasts) {
     try {
       final tideDays = forecasts?['tides']?['days'];
